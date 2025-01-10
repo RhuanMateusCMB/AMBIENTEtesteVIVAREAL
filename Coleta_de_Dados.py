@@ -49,12 +49,41 @@ st.markdown("""
         margin: auto;
         padding: 2rem;
         border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        background-color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        background-color: #1E1E1E;
+        border: 1px solid #333;
     }
     .login-title {
         text-align: center;
         margin-bottom: 2rem;
+        color: #FFFFFF;
+    }
+    /* Estilo para inputs */
+    .stTextInput>div>div>input {
+        background-color: #2D2D2D !important;
+        color: #FFFFFF !important;
+        border: 1px solid #444 !important;
+    }
+    /* Estilo para labels */
+    .stTextInput>label {
+        color: #CCCCCC !important;
+    }
+    /* Estilo para botão de submit */
+    .stButton>button {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 5px !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton>button:hover {
+        background-color: #FF3333 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    }
+    /* Ajuste da cor do texto */
+    .login-container p {
+        color: #CCCCCC !important;
     }
     </style>
     """, unsafe_allow_html=True)
