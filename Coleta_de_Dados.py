@@ -412,6 +412,8 @@ def main():
             st.session_state.df = None
         if 'dados_salvos' not in st.session_state:
             st.session_state.dados_salvos = False
+        if 'ultima_pagina' not in st.session_state:
+            st.session_state.ultima_pagina = 1
             
         # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -449,23 +451,56 @@ def main():
         # Informações sobre a coleta
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 25 páginas de resultados
+        - Coleta Rápida: 5 páginas de resultados
+        - Coleta Completa: 25 páginas de resultados
+        - Você pode continuar a coleta a partir da última página
         - Apenas terrenos em Eusébio/CE
-        - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
         
         # Separador visual
         st.markdown("<hr>", unsafe_allow_html=True)
         
-        # Botão centralizado
-        if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            st.session_state.dados_salvos = False  # Reset estado de salvamento
-            with st.spinner("Iniciando coleta de dados..."):
-                config = ConfiguracaoScraper()
-                scraper = ScraperVivaReal(config)
-                
-                st.session_state.df = scraper.coletar_dados()
-                
+        # Seleção do tipo de coleta
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🚀 Coleta Rápida (5 páginas)", type="primary", use_container_width=True):
+                st.session_state.dados_salvos = False
+                with st.spinner("Iniciando coleta rápida..."):
+                    config = ConfiguracaoScraper()
+                    scraper = ScraperVivaReal(config)
+                    st.session_state.df = scraper.coletar_dados(num_paginas=5)
+                    st.session_state.ultima_pagina = 5
+
+        with col2:
+            if st.button("📊 Coleta Completa (25 páginas)", use_container_width=True):
+                st.session_state.dados_salvos = False
+                with st.spinner("Iniciando coleta completa..."):
+                    config = ConfiguracaoScraper()
+                    scraper = ScraperVivaReal(config)
+                    st.session_state.df = scraper.coletar_dados(num_paginas=25)
+                    st.session_state.ultima_pagina = 25
+
+        # Botão para continuar coleta
+        if st.session_state.df is not None:
+            if st.button("🔄 Continuar Coleta da Última Página", use_container_width=True):
+                ultima_pagina = st.session_state.ultima_pagina
+                with st.spinner(f"Continuando coleta a partir da página {ultima_pagina}..."):
+                    config = ConfiguracaoScraper()
+                    scraper = ScraperVivaReal(config)
+                    
+                    # Ajusta a URL base para começar da última página
+                    config.url_base = f"{config.url_base}&pagina={ultima_pagina}"
+                    
+                    # Coleta mais 25 páginas a partir da última
+                    novos_dados = scraper.coletar_dados(num_paginas=25)
+                    
+                    if novos_dados is not None and not novos_dados.empty:
+                        # Combina os dados antigos com os novos
+                        st.session_state.df = pd.concat([st.session_state.df, novos_dados], ignore_index=True)
+                        st.session_state.ultima_pagina += 25
+                        st.success("✅ Coleta adicional concluída com sucesso!")
+        
         # Se temos dados coletados
         if st.session_state.df is not None and not st.session_state.df.empty:
             df = st.session_state.df
