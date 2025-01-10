@@ -1,5 +1,6 @@
 # Bibliotecas para interface web
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Bibliotecas para manipulação de dados
 import pandas as pd
@@ -147,10 +148,8 @@ class ScraperVivaReal:
 
     def _capturar_localizacao(self, navegador: webdriver.Chrome) -> tuple:
         try:
-            # Espera a página carregar completamente
             time.sleep(self.config.espera_carregamento)
 
-            # Primeira tentativa: buscar pelo seletor CSS
             try:
                 localizacao_elemento = WebDriverWait(navegador, self.config.tempo_espera).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '.search-input-location'))
@@ -163,13 +162,11 @@ class ScraperVivaReal:
             except Exception:
                 pass
     
-            # Segunda tentativa: extrair da URL
             url_parts = navegador.current_url.split('/')
             for i, part in enumerate(url_parts):
                 if part == 'ceara':
                     return 'Eusébio', 'CE'
                     
-            # Terceira tentativa: valor padrão para Eusébio
             return 'Eusébio', 'CE'
     
         except Exception as e:
@@ -178,17 +175,15 @@ class ScraperVivaReal:
 
     def _rolar_pagina(self, navegador: webdriver.Chrome) -> None:
         try:
-            # Altura total da página
             altura_total = navegador.execute_script("return document.body.scrollHeight")
             altura_atual = 0
-            passo = altura_total / 4  # Divide a rolagem em 4 partes
+            passo = altura_total / 4
             
             for _ in range(4):
                 altura_atual += passo
                 navegador.execute_script(f"window.scrollTo(0, {altura_atual});")
-                time.sleep(random.uniform(0.5, 1.0))  # Pausa aleatória entre rolagens
+                time.sleep(random.uniform(0.5, 1.0))
                 
-            # Volta um pouco para cima para parecer mais natural
             navegador.execute_script(f"window.scrollTo(0, {altura_total - 200});")
             time.sleep(1)
         except Exception as e:
@@ -197,10 +192,8 @@ class ScraperVivaReal:
     def _extrair_dados_imovel(self, imovel: webdriver.remote.webelement.WebElement,
                     id_global: int, pagina: int) -> Optional[Dict]:
         try:
-            # Aguardar elementos específicos com timeout individual
             wait = WebDriverWait(imovel, 10)
             
-            # Extrair preço com retry
             try:
                 preco_elemento = wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="price"]'))
@@ -210,7 +203,6 @@ class ScraperVivaReal:
                 self.logger.warning(f"Erro ao extrair preço: {e}")
                 return None
 
-            # Extrair área com retry
             try:
                 area_elemento = wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'span[class*="detail-area"]'))
@@ -220,7 +212,6 @@ class ScraperVivaReal:
                 self.logger.warning(f"Erro ao extrair área: {e}")
                 return None
 
-            # Funções auxiliares para conversão
             def converter_preco(texto: str) -> float:
                 try:
                     numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
@@ -235,15 +226,12 @@ class ScraperVivaReal:
                 except (ValueError, AttributeError):
                     return 0.0
 
-            # Converter valores
             preco = converter_preco(preco_texto)
             area = converter_area(area_texto)
-
-            # Calcular preço por m² com validação
             preco_m2 = round(preco / area, 2) if area > 0 else 0.0
 
             try:
-                titulo = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text,  # Correção aqui
+                titulo = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text
             except Exception:
                 titulo = "Título não disponível"
 
@@ -261,7 +249,6 @@ class ScraperVivaReal:
             except Exception:
                 link = ""
 
-            # Validar dados críticos
             if preco == 0 or area == 0:
                 self.logger.warning(f"Dados incompletos para imóvel ID {id_global}: Preço={preco}, Área={area}")
                 return None
@@ -317,13 +304,11 @@ class ScraperVivaReal:
             navegador.get(self.config.url_base)
             self.logger.info("Navegador acessou a URL com sucesso")
             
-            # Aguarda página carregar completamente
-            for _ in range(30):  # 30 segundos de tentativa
+            for _ in range(30):
                 if self._verificar_pagina_carregada(navegador):
                     break
                 time.sleep(1)
             
-            # Verificar se a lista de resultados está presente
             try:
                 lista_resultados = espera.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'div.results-list'))
@@ -344,14 +329,12 @@ class ScraperVivaReal:
                     progresso.progress(pagina / num_paginas)
                     self.logger.info(f"Processando página {pagina}")
                     
-                    # Pausa aleatória entre páginas
                     pausa = random.uniform(1, 3)
                     time.sleep(pausa)
                     
                     time.sleep(self.config.espera_carregamento)
                     self._rolar_pagina(navegador)
 
-                    # Tenta várias vezes encontrar os imóveis
                     imoveis = None
                     for tentativa in range(3):
                         try:
@@ -382,9 +365,7 @@ class ScraperVivaReal:
                         botao_proxima = self._encontrar_botao_proxima(espera)
                         if not botao_proxima:
                             break
-                        # Usa JavaScript para clicar no botão
                         navegador.execute_script("arguments[0].click();", botao_proxima)
-                        # Pausa aleatória após clicar no botão
                         time.sleep(2)
 
                 except Exception as e:
@@ -423,24 +404,33 @@ def main():
             </p>
         </div>
         """, unsafe_allow_html=True)
+
+        # Incorporação do relatório do Looker Studio
+        st.components.v1.iframe(
+            src="https://lookerstudio.google.com/embed/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda/page/BRhaE",
+            width=800,
+            height=600,
+            scrolling=True
+        )
         
-        # Botão para o Looker Studio
+        # Botão alternativo para abrir em nova aba
         st.markdown("""
         <div style='text-align: center; padding: 1rem 0;'>
+            <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
             <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
                 <button style='
                     background-color: #FF4B4B;
                     color: white;
-                    padding: 12px 24px;
+                    padding: 8px 16px;
                     border: none;
                     border-radius: 8px;
-                    font-size: 18px;
+                    font-size: 14px;
                     cursor: pointer;
                     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                     transition: all 0.3s ease;
-                    margin: 10px 0;
+                    margin: 5px 0;
                 '>
-                    📊 Acessar Dashboard no Looker Studio
+                    📊 Abrir em Nova Aba
                 </button>
             </a>
         </div>
