@@ -81,6 +81,7 @@ class ScraperVivaReal:
     def __init__(self, config: ConfiguracaoScraper):
         self.config = config
         self.logger = self._configurar_logger()
+        self.navegador = None
 
     @staticmethod
     def _configurar_logger() -> logging.Logger:
@@ -285,8 +286,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 25, pagina_inicial: int = 1) -> Optional[pd.DataFrame]:
-        navegador = None
+    def coletar_dados(self, num_paginas: int = 25, pagina_inicial: int = 1, navegador_existente=None) -> Optional[pd.DataFrame]:
         todos_dados: List[Dict] = []
         id_global = 0
         progresso = st.progress(0)
@@ -294,32 +294,28 @@ class ScraperVivaReal:
     
         try:
             self.logger.info(f"Iniciando coleta de dados a partir da página {pagina_inicial}")
-            navegador = self._configurar_navegador()
-            if navegador is None:
-                st.error("Não foi possível inicializar o navegador")
-                return None
+            
+            if navegador_existente:
+                self.navegador = navegador_existente
+                self.logger.info("Usando navegador existente")
+            else:
+                self.navegador = self._configurar_navegador()
+                if self.navegador is None:
+                    st.error("Não foi possível inicializar o navegador")
+                    return None
     
-            espera = WebDriverWait(navegador, self.config.tempo_espera)
-            navegador.get(self.config.url_base)
-            self.logger.info("Navegador acessou a URL com sucesso")
+            espera = WebDriverWait(self.navegador, self.config.tempo_espera)
             
-            # Se não estamos começando da página 1, precisamos navegar até a página inicial
-            if pagina_inicial > 1:
-                for _ in range(pagina_inicial - 1):
-                    try:
-                        botao_proxima = self._encontrar_botao_proxima(espera)
-                        if botao_proxima:
-                            navegador.execute_script("arguments[0].click();", botao_proxima)
-                            time.sleep(2)
-                    except Exception as e:
-                        self.logger.error(f"Erro ao navegar até a página inicial: {str(e)}")
+            # Se não temos navegador existente, precisamos acessar a URL inicial
+            if not navegador_existente:
+                self.navegador.get(self.config.url_base)
+                self.logger.info("Navegador acessou a URL com sucesso")
+                
+                # Aguarda página carregar completamente
+                for _ in range(30):
+                    if self._verificar_pagina_carregada(self.navegador):
                         break
-            
-            # Aguarda página carregar completamente
-            for _ in range(30):
-                if self._verificar_pagina_carregada(navegador):
-                    break
-                time.sleep(1)
+                    time.sleep(1)
             
             try:
                 lista_resultados = espera.until(
@@ -330,7 +326,7 @@ class ScraperVivaReal:
                 self.logger.error("Não foi possível encontrar a lista de resultados")
                 return None
 
-            localidade, estado = self._capturar_localizacao(navegador)
+            localidade, estado = self._capturar_localizacao(self.navegador)
             if not localidade or not estado:
                 st.error("Não foi possível capturar a localização")
                 return None
@@ -345,7 +341,7 @@ class ScraperVivaReal:
                     time.sleep(pausa)
                     
                     time.sleep(self.config.espera_carregamento)
-                    self._rolar_pagina(navegador)
+                    self._rolar_pagina(self.navegador)
 
                     imoveis = None
                     for tentativa in range(3):
@@ -377,7 +373,7 @@ class ScraperVivaReal:
                         botao_proxima = self._encontrar_botao_proxima(espera)
                         if not botao_proxima:
                             break
-                        navegador.execute_script("arguments[0].click();", botao_proxima)
+                        self.navegador.execute_script("arguments[0].click();", botao_proxima)
                         time.sleep(2)
 
                 except Exception as e:
@@ -391,12 +387,13 @@ class ScraperVivaReal:
             st.error(f"Erro durante a coleta: {str(e)}")
             return None
 
-        finally:
-            if navegador:
-                try:
-                    navegador.quit()
-                except Exception as e:
-                    self.logger.error(f"Erro ao fechar navegador: {str(e)}")
+    def fechar_navegador(self):
+        if self.navegador:
+            try:
+                self.navegador.quit()
+                self.navegador = None
+            except Exception as e:
+                self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 def main():
     try:
         # Inicializar session_state
@@ -406,6 +403,8 @@ def main():
             st.session_state.dados_salvos = False
         if 'ultima_pagina' not in st.session_state:
             st.session_state.ultima_pagina = 1
+        if 'scraper' not in st.session_state:
+            st.session_state.scraper = None
             
         # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -445,23 +444,31 @@ def main():
         ℹ️ **Informações sobre a coleta:**
         - Coleta Rápida: 5 páginas de resultados
         - Coleta Completa: 25 páginas de resultados
-        - Você pode continuar a coleta a partir da última página
+        - O navegador permanece aberto para continuar a coleta
         - Apenas terrenos em Eusébio/CE
         """)
         
         # Separador visual
         st.markdown("<hr>", unsafe_allow_html=True)
         
+        # Status do navegador
+        if st.session_state.scraper and st.session_state.scraper.navegador:
+            st.success("✅ Navegador ativo")
+        else:
+            st.warning("⚠️ Navegador não iniciado")
+        
         # Seleção do tipo de coleta
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             if st.button("🚀 Coleta Rápida (5 páginas)", type="primary", use_container_width=True):
                 st.session_state.dados_salvos = False
                 with st.spinner("Iniciando coleta rápida..."):
                     config = ConfiguracaoScraper()
-                    scraper = ScraperVivaReal(config)
-                    st.session_state.df = scraper.coletar_dados(num_paginas=5)
+                    # Criar novo scraper apenas se não existir
+                    if st.session_state.scraper is None:
+                        st.session_state.scraper = ScraperVivaReal(config)
+                    st.session_state.df = st.session_state.scraper.coletar_dados(num_paginas=5)
                     st.session_state.ultima_pagina = 5
 
         with col2:
@@ -469,9 +476,18 @@ def main():
                 st.session_state.dados_salvos = False
                 with st.spinner("Iniciando coleta completa..."):
                     config = ConfiguracaoScraper()
-                    scraper = ScraperVivaReal(config)
-                    st.session_state.df = scraper.coletar_dados(num_paginas=25)
+                    # Criar novo scraper apenas se não existir
+                    if st.session_state.scraper is None:
+                        st.session_state.scraper = ScraperVivaReal(config)
+                    st.session_state.df = st.session_state.scraper.coletar_dados(num_paginas=25)
                     st.session_state.ultima_pagina = 25
+
+        with col3:
+            if st.button("🔴 Encerrar Navegador", use_container_width=True):
+                if st.session_state.scraper:
+                    st.session_state.scraper.fechar_navegador()
+                    st.session_state.scraper = None
+                    st.success("✅ Navegador encerrado com sucesso!")
 
         # Botão para continuar coleta
         if st.session_state.df is not None:
@@ -479,28 +495,29 @@ def main():
             st.markdown(f"**Última página coletada:** {ultima_pagina}")
             
             if st.button("🔄 Continuar Coleta da Última Página", use_container_width=True):
-                with st.spinner(f"Continuando coleta a partir da página {ultima_pagina + 1}..."):
-                    config = ConfiguracaoScraper()
-                    scraper = ScraperVivaReal(config)
-                    
-                    # Coleta mais 25 páginas a partir da última, começando da página correta
-                    novos_dados = scraper.coletar_dados(
-                        num_paginas=25,
-                        pagina_inicial=ultima_pagina + 1
-                    )
-                    
-                    if novos_dados is not None and not novos_dados.empty:
-                        # Atualiza o ID dos novos dados para evitar duplicação
-                        ultimo_id = st.session_state.df['id'].max()
-                        novos_dados['id'] = novos_dados['id'] + ultimo_id
-                        
-                        # Combina os dados antigos com os novos
-                        st.session_state.df = pd.concat(
-                            [st.session_state.df, novos_dados], 
-                            ignore_index=True
+                if st.session_state.scraper is None or st.session_state.scraper.navegador is None:
+                    st.error("❌ O navegador foi fechado. Por favor, inicie uma nova coleta.")
+                else:
+                    with st.spinner(f"Continuando coleta a partir da página {ultima_pagina + 1}..."):
+                        # Usar o navegador existente
+                        novos_dados = st.session_state.scraper.coletar_dados(
+                            num_paginas=25,
+                            pagina_inicial=ultima_pagina + 1,
+                            navegador_existente=st.session_state.scraper.navegador
                         )
-                        st.session_state.ultima_pagina += 25
-                        st.success("✅ Coleta adicional concluída com sucesso!")
+                        
+                        if novos_dados is not None and not novos_dados.empty:
+                            # Atualiza o ID dos novos dados para evitar duplicação
+                            ultimo_id = st.session_state.df['id'].max()
+                            novos_dados['id'] = novos_dados['id'] + ultimo_id
+                            
+                            # Combina os dados antigos com os novos
+                            st.session_state.df = pd.concat(
+                                [st.session_state.df, novos_dados], 
+                                ignore_index=True
+                            )
+                            st.session_state.ultima_pagina += 25
+                            st.success("✅ Coleta adicional concluída com sucesso!")
         
         # Se temos dados coletados
         if st.session_state.df is not None and not st.session_state.df.empty:
@@ -516,8 +533,6 @@ def main():
             with col3:
                 area_media = df['area_m2'].mean()
                 st.metric("Área Média", f"{area_media:,.2f} m²")
-            
-            st.success("✅ Dados coletados com sucesso!")
             
             # Exibição dos dados
             st.markdown("### 📊 Dados Coletados")
@@ -576,6 +591,11 @@ def main():
     except Exception as e:
         st.error(f"❌ Erro inesperado: {str(e)}")
         st.error("Por favor, atualize a página e tente novamente.")
+        
+        # Em caso de erro, tenta fechar o navegador
+        if 'scraper' in st.session_state and st.session_state.scraper:
+            st.session_state.scraper.fechar_navegador()
+            st.session_state.scraper = None
 
 if __name__ == "__main__":
     main()
