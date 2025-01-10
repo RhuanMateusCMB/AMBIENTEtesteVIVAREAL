@@ -463,13 +463,14 @@ def main():
         with col1:
             if st.button("🚀 Coleta Rápida (5 páginas)", type="primary", use_container_width=True):
                 st.session_state.dados_salvos = False
+                st.session_state.coleta_em_andamento = True
                 with st.spinner("Iniciando coleta rápida..."):
                     config = ConfiguracaoScraper()
-                    # Criar novo scraper apenas se não existir
                     if st.session_state.scraper is None:
                         st.session_state.scraper = ScraperVivaReal(config)
                     st.session_state.df = st.session_state.scraper.coletar_dados(num_paginas=5)
                     st.session_state.ultima_pagina = 5
+                st.session_state.coleta_em_andamento = False
 
         with col2:
             if st.button("📊 Coleta Completa (25 páginas)", use_container_width=True):
