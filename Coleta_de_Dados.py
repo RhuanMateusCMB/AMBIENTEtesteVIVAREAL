@@ -286,7 +286,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 34) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 25) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -404,42 +404,11 @@ def main():
             </p>
         </div>
         """, unsafe_allow_html=True)
-
-        # Incorporação do relatório do Looker Studio
-        st.components.v1.iframe(
-            src="https://lookerstudio.google.com/embed/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda/page/BRhaE",
-            width=800,
-            height=600,
-            scrolling=True
-        )
-        
-        # Botão alternativo para abrir em nova aba
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
-            <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
-                <button style='
-                    background-color: #FF4B4B;
-                    color: white;
-                    padding: 8px 16px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    cursor: pointer;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    transition: all 0.3s ease;
-                    margin: 5px 0;
-                '>
-                    📊 Abrir em Nova Aba
-                </button>
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Informações sobre a coleta
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 34 páginas de resultados
+        - Serão coletadas 25 páginas de resultados
         - Apenas terrenos em Eusébio/CE
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
@@ -525,6 +494,41 @@ def main():
                 <p>Desenvolvido com ❤️ por Rhuan Mateus - CMB Capital</p>
                 <p style='font-size: 0.8em;'>Última atualização: Janeiro 2025</p>
             </div>
+        """, unsafe_allow_html=True)
+
+        # Separador visual para o relatório
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("## 📊 Relatório Detalhado")
+        
+        # Incorporação do relatório do Looker Studio
+        st.components.v1.iframe(
+            src="https://lookerstudio.google.com/embed/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda/page/BRhaE",
+            width=1200,
+            height=800,
+            scrolling=True
+        )
+        
+        # Botão alternativo para abrir em nova aba
+        st.markdown("""
+        <div style='text-align: center; padding: 1rem 0;'>
+            <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
+            <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
+                <button style='
+                    background-color: #FF4B4B;
+                    color: white;
+                    padding: 8px 16px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    transition: all 0.3s ease;
+                    margin: 5px 0;
+                '>
+                    📊 Abrir em Nova Aba
+                </button>
+            </a>
+        </div>
         """, unsafe_allow_html=True)
         
     except Exception as e:
