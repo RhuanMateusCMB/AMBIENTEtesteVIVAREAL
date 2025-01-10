@@ -73,6 +73,7 @@ def login_page():
     st.markdown("""
         <div class="login-container">
             <h1 class="login-title">🏗️ CMB Capital</h1>
+            <p style='text-align: center; color: #666;'>Sistema de Coleta de Dados</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -82,8 +83,10 @@ def login_page():
         submit = st.form_submit_button("Entrar")
 
         if submit:
-            if email == EMAIL_CORRETO and password == SENHA_CORRETA:
+            db = SupabaseManager()
+            if db.verificar_credenciais(email, password):
                 st.session_state.logged_in = True
+                st.session_state.user_email = email
                 st.rerun()
             else:
                 st.error("Email ou senha incorretos!")
@@ -102,6 +105,22 @@ class SupabaseManager:
         self.url = st.secrets["SUPABASE_URL"]
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
+
+    def verificar_credenciais(self, email: str, senha: str) -> bool:
+        try:
+            # Hash da senha para comparação segura
+            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+            
+            # Busca o usuário com o email fornecido
+            response = self.supabase.table('usuarios').select('*').eq('email', email).execute()
+            
+            if response.data and len(response.data) > 0:
+                usuario = response.data[0]
+                return usuario['senha_hash'] == senha_hash
+            return False
+        except Exception as e:
+            st.error(f"Erro ao verificar credenciais: {str(e)}")
+            return False
 
     def limpar_tabela(self):
         self.supabase.table('teste').delete().neq('id', 0).execute()
