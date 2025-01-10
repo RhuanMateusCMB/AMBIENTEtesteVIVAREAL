@@ -20,6 +20,7 @@ from datetime import datetime
 import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
+import hashlib
 
 # Biblioteca para conexão com Supabase
 from supabase import create_client
@@ -43,8 +44,50 @@ st.markdown("""
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
+    .login-container {
+        max-width: 400px;
+        margin: auto;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background-color: white;
+    }
+    .login-title {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
     </style>
     """, unsafe_allow_html=True)
+
+# Constantes de autenticação
+EMAIL_CORRETO = "admincmbcapital@admin.com.br"
+SENHA_CORRETA = "Admin2025@cmbcapital"
+
+def check_login():
+    """Verifica se o usuário está logado"""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+
+def login_page():
+    """Renderiza a página de login"""
+    st.markdown("""
+        <div class="login-container">
+            <h1 class="login-title">🏗️ CMB Capital</h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        email = st.text_input("Email", key="email")
+        password = st.text_input("Senha", type="password", key="password")
+        submit = st.form_submit_button("Entrar")
+
+        if submit:
+            if email == EMAIL_CORRETO and password == SENHA_CORRETA:
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Email ou senha incorretos!")
+
 
 @dataclass
 class ConfiguracaoScraper:
@@ -286,7 +329,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 35) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 25) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -388,11 +431,26 @@ class ScraperVivaReal:
 
 def main():
     try:
+        # Verifica o estado do login
+        check_login()
+
+        # Se não estiver logado, mostra a página de login
+        if not st.session_state.logged_in:
+            login_page()
+            return
+
         # Inicializar session_state
         if 'df' not in st.session_state:
             st.session_state.df = None
         if 'dados_salvos' not in st.session_state:
             st.session_state.dados_salvos = False
+            
+        # Adiciona botão de logout no canto superior direito
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("Logout"):
+                st.session_state.logged_in = False
+                st.rerun()
             
         # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -408,7 +466,7 @@ def main():
         # Informações sobre a coleta
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 35 páginas de resultados
+        - Serão coletadas 25 páginas de resultados
         - Apenas terrenos em Eusébio/CE
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
