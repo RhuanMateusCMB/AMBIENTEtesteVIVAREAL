@@ -82,6 +82,7 @@ class ScraperVivaReal:
         self.config = config
         self.logger = self._configurar_logger()
         self.navegador = None
+        self.pagina_atual = 1
 
     @staticmethod
     def _configurar_logger() -> logging.Logger:
@@ -109,13 +110,11 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
             opcoes_chrome.add_argument('--enable-javascript')
             
-            # Headers mais realistas
             user_agent = self._get_random_user_agent()
             opcoes_chrome.add_argument(f'--user-agent={user_agent}')
             opcoes_chrome.add_argument('--accept-language=pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7')
             opcoes_chrome.add_argument('--accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8')
             
-            # Configurações adicionais
             opcoes_chrome.add_argument('--disable-notifications')
             opcoes_chrome.add_argument('--disable-popup-blocking')
             opcoes_chrome.add_argument('--disable-extensions')
@@ -124,13 +123,11 @@ class ScraperVivaReal:
             service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
             
-            # Configurações adicionais para evitar detecção
             navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
                 "userAgent": user_agent,
                 "platform": "Windows NT 10.0; Win64; x64"
             })
             
-            # Adicionar propriedades ao objeto navigator
             navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             navegador.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt']})")
             navegador.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
@@ -286,15 +283,13 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 25, pagina_inicial: int = 1, navegador_existente=None) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 25, navegador_existente=None, continuar_coleta=False) -> Optional[pd.DataFrame]:
         todos_dados: List[Dict] = []
         id_global = 0
         progresso = st.progress(0)
         status = st.empty()
     
         try:
-            self.logger.info(f"Iniciando coleta de dados a partir da página {pagina_inicial}")
-            
             if navegador_existente:
                 self.navegador = navegador_existente
                 self.logger.info("Usando navegador existente")
@@ -303,14 +298,14 @@ class ScraperVivaReal:
                 if self.navegador is None:
                     st.error("Não foi possível inicializar o navegador")
                     return None
-    
-            espera = WebDriverWait(self.navegador, self.config.tempo_espera)
-            
-            # Se não temos navegador existente, precisamos acessar a URL inicial
-            if not navegador_existente:
                 self.navegador.get(self.config.url_base)
                 self.logger.info("Navegador acessou a URL com sucesso")
-                
+                self.pagina_atual = 1
+
+            espera = WebDriverWait(self.navegador, self.config.tempo_espera)
+            
+            # Se não é continuação, precisamos carregar a primeira página
+            if not continuar_coleta:
                 # Aguarda página carregar completamente
                 for _ in range(30):
                     if self._verificar_pagina_carregada(self.navegador):
@@ -331,11 +326,14 @@ class ScraperVivaReal:
                 st.error("Não foi possível capturar a localização")
                 return None
 
-            for pagina in range(pagina_inicial, pagina_inicial + num_paginas):
+            paginas_para_coletar = num_paginas
+            self.logger.info(f"Iniciando/Continuando coleta a partir da página {self.pagina_atual}")
+
+            while paginas_para_coletar > 0:
                 try:
-                    status.text(f"⏳ Processando página {pagina}")
-                    progresso.progress((pagina - pagina_inicial + 1) / num_paginas)
-                    self.logger.info(f"Processando página {pagina}")
+                    status.text(f"⏳ Processando página {self.pagina_atual}")
+                    progresso.progress((num_paginas - paginas_para_coletar) / num_paginas)
+                    self.logger.info(f"Processando página {self.pagina_atual}")
                     
                     pausa = random.uniform(1, 3)
                     time.sleep(pausa)
@@ -359,26 +357,30 @@ class ScraperVivaReal:
                             continue
 
                     if not imoveis:
-                        self.logger.warning(f"Sem imóveis na página {pagina}")
+                        self.logger.warning(f"Sem imóveis na página {self.pagina_atual}")
                         break
 
                     for imovel in imoveis:
                         id_global += 1
-                        if dados := self._extrair_dados_imovel(imovel, id_global, pagina):
+                        if dados := self._extrair_dados_imovel(imovel, id_global, self.pagina_atual):
                             dados['estado'] = estado
                             dados['localidade'] = localidade
                             todos_dados.append(dados)
 
-                    if pagina < (pagina_inicial + num_paginas - 1):
+                    if paginas_para_coletar > 1:  # Alterado para verificar se tem próxima página
                         botao_proxima = self._encontrar_botao_proxima(espera)
                         if not botao_proxima:
+                            self.logger.warning("Botão próxima página não encontrado")
                             break
                         self.navegador.execute_script("arguments[0].click();", botao_proxima)
+                        self.pagina_atual += 1
                         time.sleep(2)
+                    
+                    paginas_para_coletar -= 1
 
                 except Exception as e:
-                    self.logger.error(f"Erro na página {pagina}: {str(e)}")
-                    continue
+                    self.logger.error(f"Erro na página {self.pagina_atual}: {str(e)}")
+                    break
 
             return pd.DataFrame(todos_dados) if todos_dados else None
 
@@ -392,6 +394,7 @@ class ScraperVivaReal:
             try:
                 self.navegador.quit()
                 self.navegador = None
+                self.pagina_atual = 1
             except Exception as e:
                 self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 def main():
@@ -492,12 +495,8 @@ def main():
 
         # Botão para continuar coleta
         if st.session_state.df is not None:
-            ultima_pagina = st.session_state.ultima_pagina
+            ultima_pagina = st.session_state.scraper.pagina_atual if st.session_state.scraper else 0
             st.markdown(f"**Última página coletada:** {ultima_pagina}")
-            
-            # Adiciona flag para controle de coleta em andamento
-            if 'coleta_em_andamento' not in st.session_state:
-                st.session_state.coleta_em_andamento = False
             
             if not st.session_state.coleta_em_andamento:
                 if st.button("🔄 Continuar Coleta da Última Página", use_container_width=True):
@@ -505,12 +504,14 @@ def main():
                         st.error("❌ O navegador foi fechado. Por favor, inicie uma nova coleta.")
                     else:
                         st.session_state.coleta_em_andamento = True
-                        with st.spinner(f"Continuando coleta a partir da página {ultima_pagina + 1}..."):
-                            # Usar o navegador existente
+                        with st.spinner(f"Continuando coleta da página {ultima_pagina + 1} até 25..."):
+                            paginas_restantes = 25 - ultima_pagina
+                            
+                            # Continuar coleta usando o navegador existente na página atual
                             novos_dados = st.session_state.scraper.coletar_dados(
-                                num_paginas=25,
-                                pagina_inicial=ultima_pagina + 1,
-                                navegador_existente=st.session_state.scraper.navegador
+                                num_paginas=paginas_restantes,
+                                navegador_existente=st.session_state.scraper.navegador,
+                                continuar_coleta=True
                             )
                             
                             if novos_dados is not None and not novos_dados.empty:
@@ -523,8 +524,7 @@ def main():
                                     [st.session_state.df, novos_dados], 
                                     ignore_index=True
                                 )
-                                st.session_state.ultima_pagina += 25
-                                st.success("✅ Coleta adicional concluída com sucesso!")
+                                st.success(f"✅ Coleta concluída! Total de {st.session_state.scraper.pagina_atual} páginas coletadas.")
                         st.session_state.coleta_em_andamento = False
         
         # Se temos dados coletados
