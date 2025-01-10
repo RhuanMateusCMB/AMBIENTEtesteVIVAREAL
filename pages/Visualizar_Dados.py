@@ -3,6 +3,7 @@ import pandas as pd
 from supabase import create_client
 import plotly.express as px
 from datetime import datetime
+import hashlib
 
 # Configuração da página
 st.set_page_config(
@@ -11,12 +12,55 @@ st.set_page_config(
     layout="wide"
 )
 
+# Estilo CSS personalizado
+st.markdown("""
+    <style>
+    .stButton>button {
+        width: 100%;
+        height: 3em;
+        font-size: 20px;
+    }
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    .login-container {
+        max-width: 400px;
+        margin: auto;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background-color: white;
+    }
+    .login-title {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Classe para gerenciar conexão com Supabase
 class SupabaseManager:
     def __init__(self):
         self.url = st.secrets["SUPABASE_URL"]
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
+
+    def verificar_credenciais(self, email: str, senha: str) -> bool:
+        try:
+            # Hash da senha para comparação segura
+            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+            
+            # Busca o usuário com o email fornecido
+            response = self.supabase.table('usuarios').select('*').eq('email', email).execute()
+            
+            if response.data and len(response.data) > 0:
+                usuario = response.data[0]
+                return usuario['senha_hash'] == senha_hash
+            return False
+        except Exception as e:
+            st.error(f"Erro ao verificar credenciais: {str(e)}")
+            return False
 
     def obter_dados(self):
         try:
@@ -26,7 +70,50 @@ class SupabaseManager:
             st.error(f"Erro ao obter dados do Supabase: {str(e)}")
             return None
 
+def check_login():
+    """Verifica se o usuário está logado"""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+
+def login_page():
+    """Renderiza a página de login"""
+    st.markdown("""
+        <div class="login-container">
+            <h1 class="login-title">🏗️ CMB Capital</h1>
+            <p style='text-align: center; color: #666;'>Visualização de Dados</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        email = st.text_input("Email", key="email")
+        password = st.text_input("Senha", type="password", key="password")
+        submit = st.form_submit_button("Entrar")
+
+        if submit:
+            db = SupabaseManager()
+            if db.verificar_credenciais(email, password):
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                st.rerun()
+            else:
+                st.error("Email ou senha incorretos!")
+
 def main():
+    # Verifica o estado do login
+    check_login()
+
+    # Se não estiver logado, mostra a página de login
+    if not st.session_state.logged_in:
+        login_page()
+        return
+
+    # Adiciona botão de logout no canto superior direito
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+
     # Título e descrição
     st.title("📊 Visualização de Dados - Terrenos em Eusébio")
     
