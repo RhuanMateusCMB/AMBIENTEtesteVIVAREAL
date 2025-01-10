@@ -494,30 +494,37 @@ def main():
             ultima_pagina = st.session_state.ultima_pagina
             st.markdown(f"**Última página coletada:** {ultima_pagina}")
             
-            if st.button("🔄 Continuar Coleta da Última Página", use_container_width=True):
-                if st.session_state.scraper is None or st.session_state.scraper.navegador is None:
-                    st.error("❌ O navegador foi fechado. Por favor, inicie uma nova coleta.")
-                else:
-                    with st.spinner(f"Continuando coleta a partir da página {ultima_pagina + 1}..."):
-                        # Usar o navegador existente
-                        novos_dados = st.session_state.scraper.coletar_dados(
-                            num_paginas=25,
-                            pagina_inicial=ultima_pagina + 1,
-                            navegador_existente=st.session_state.scraper.navegador
-                        )
-                        
-                        if novos_dados is not None and not novos_dados.empty:
-                            # Atualiza o ID dos novos dados para evitar duplicação
-                            ultimo_id = st.session_state.df['id'].max()
-                            novos_dados['id'] = novos_dados['id'] + ultimo_id
-                            
-                            # Combina os dados antigos com os novos
-                            st.session_state.df = pd.concat(
-                                [st.session_state.df, novos_dados], 
-                                ignore_index=True
+            # Adiciona flag para controle de coleta em andamento
+            if 'coleta_em_andamento' not in st.session_state:
+                st.session_state.coleta_em_andamento = False
+            
+            if not st.session_state.coleta_em_andamento:
+                if st.button("🔄 Continuar Coleta da Última Página", use_container_width=True):
+                    if st.session_state.scraper is None or st.session_state.scraper.navegador is None:
+                        st.error("❌ O navegador foi fechado. Por favor, inicie uma nova coleta.")
+                    else:
+                        st.session_state.coleta_em_andamento = True
+                        with st.spinner(f"Continuando coleta a partir da página {ultima_pagina + 1}..."):
+                            # Usar o navegador existente
+                            novos_dados = st.session_state.scraper.coletar_dados(
+                                num_paginas=25,
+                                pagina_inicial=ultima_pagina + 1,
+                                navegador_existente=st.session_state.scraper.navegador
                             )
-                            st.session_state.ultima_pagina += 25
-                            st.success("✅ Coleta adicional concluída com sucesso!")
+                            
+                            if novos_dados is not None and not novos_dados.empty:
+                                # Atualiza o ID dos novos dados para evitar duplicação
+                                ultimo_id = st.session_state.df['id'].max()
+                                novos_dados['id'] = novos_dados['id'] + ultimo_id
+                                
+                                # Combina os dados antigos com os novos
+                                st.session_state.df = pd.concat(
+                                    [st.session_state.df, novos_dados], 
+                                    ignore_index=True
+                                )
+                                st.session_state.ultima_pagina += 25
+                                st.success("✅ Coleta adicional concluída com sucesso!")
+                        st.session_state.coleta_em_andamento = False
         
         # Se temos dados coletados
         if st.session_state.df is not None and not st.session_state.df.empty:
