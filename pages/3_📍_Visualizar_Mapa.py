@@ -4,8 +4,12 @@ from datetime import datetime
 import streamlit.components.v1 as components
 from supabase import create_client
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import time
 import json
+import os
+import random
 
 # Configuração da página
 st.set_page_config(
@@ -55,28 +59,77 @@ def init_connection():
         st.secrets["SUPABASE_KEY"]
     )
 
-@st.cache_data(ttl=3600)  # Cache por 1 hora
-def geocode_address(address):
-    """Converte endereço em coordenadas usando Nominatim (OpenStreetMap)"""
+def get_cache_file():
+    return "geocoding_cache.json"
+
+def load_cache():
     try:
-        # Adiciona 'Eusébio, CE, Brasil' ao endereço se não estiver presente
-        if 'eusebio' not in address.lower():
-            address = f"{address}, Eusébio, CE, Brasil"
+        if os.path.exists(get_cache_file()):
+            with open(get_cache_file(), 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return {}
+
+def save_cache(cache):
+    try:
+        with open(get_cache_file(), 'w') as f:
+            json.dump(cache, f)
+    except:
+        pass
+
+@st.cache_data(ttl=3600)
+def geocode_address(address):
+    """Converte endereço em coordenadas com retry e cache"""
+    try:
+        # Verifica cache primeiro
+        cache = load_cache()
+        if address in cache:
+            return cache[address]
             
-        url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json&limit=1"
-        headers = {'User-Agent': 'CMBCapital/1.0'}
+        # Configura sessão com retry
+        session = requests.Session()
+        retry = Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+
+        # Adiciona Eusébio, CE ao endereço
+        search_address = f"{address}, Eusébio, Ceará, Brasil"
+            
+        url = "https://nominatim.openstreetmap.org/search"
+        headers = {
+            'User-Agent': 'CMBCapital/1.0',
+            'Accept-Language': 'pt-BR,pt'
+        }
+        params = {
+            'q': search_address,
+            'format': 'json',
+            'limit': 1
+        }
         
-        response = requests.get(url, headers=headers)
+        response = session.get(url, headers=headers, params=params, timeout=10)
         data = response.json()
         
         if data:
-            return float(data[0]['lat']), float(data[0]['lon'])
-        return None
+            coords = (float(data[0]['lat']), float(data[0]['lon']))
+            # Salva no cache
+            cache[address] = coords
+            save_cache(cache)
+            return coords
+            
+        # Fallback: coordenadas aproximadas de Eusébio
+        return (-3.8912, -38.4558)
+        
     except Exception as e:
-        st.error(f"Erro no geocoding: {str(e)}")
-        return None
+        st.warning(f"Usando coordenadas aproximadas para: {address}")
+        return (-3.8912, -38.4558)
 
-@st.cache_data(ttl=3600)  # Cache por 1 hora
+@st.cache_data(ttl=3600)
 def get_data():
     """Busca e processa os dados do Supabase"""
     try:
@@ -87,29 +140,38 @@ def get_data():
         # Adiciona coordenadas para cada endereço
         coordinates = []
         total = len(df)
-        progress_text = "Processando endereços..."
-        progress_bar = st.progress(0, text=progress_text)
         
-        for idx, row in df.iterrows():
-            progress = (idx + 1) / total
-            progress_bar.progress(progress, text=f"{progress_text} ({idx+1}/{total})")
+        with st.spinner("Geocodificando endereços..."):
+            progress_bar = st.progress(0)
             
-            coords = geocode_address(row['endereco'])
-            if coords:
-                coordinates.append(coords)
-            else:
-                # Coordenadas aproximadas com variação
-                lat = -3.8912 + (0.02 * ((idx % 10) - 5))
-                lon = -38.4558 + (0.02 * ((idx % 10) - 5))
-                coordinates.append((lat, lon))
+            for idx, row in df.iterrows():
+                progress = (idx + 1) / total
+                progress_bar.progress(progress)
+                
+                coords = geocode_address(row['endereco'])
+                if coords:
+                    # Adiciona pequena variação se usar coordenadas padrão
+                    if coords == (-3.8912, -38.4558):
+                        lat = coords[0] + (random.uniform(-0.01, 0.01))
+                        lon = coords[1] + (random.uniform(-0.01, 0.01))
+                        coordinates.append((lat, lon))
+                    else:
+                        coordinates.append(coords)
+                else:
+                    # Coordenadas padrão com variação
+                    lat = -3.8912 + (random.uniform(-0.01, 0.01))
+                    lon = -38.4558 + (random.uniform(-0.01, 0.01))
+                    coordinates.append((lat, lon))
+                
+                time.sleep(1)  # Respeita limite de requisições
             
-            time.sleep(1)  # Respeita limite de requisições
-        
+            progress_bar.empty()
+            
         df['latitude'] = [c[0] for c in coordinates]
         df['longitude'] = [c[1] for c in coordinates]
         
-        progress_bar.empty()
         return df
+        
     except Exception as e:
         st.error(f"Erro ao buscar dados: {str(e)}")
         return None
