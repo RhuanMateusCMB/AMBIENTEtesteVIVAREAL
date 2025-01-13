@@ -27,17 +27,38 @@ def conectar_supabase():
 
 # Função para obter as coordenadas de um endereço
 def get_coordinates(address):
-    try:
-        geolocator = Nominatim(user_agent="cmb_capital_app")
-        # Adiciona ", Eusébio, CE, Brasil" ao endereço para melhorar a precisão
-        full_address = f"{address}, Eusébio, CE, Brasil"
-        location = geolocator.geocode(full_address)
-        
-        if location:
-            return location.latitude, location.longitude
+    if not address or address == "Endereço não disponível":
         return None
-    except (GeocoderTimedOut, GeocoderServiceError):
-        time.sleep(1)  # Espera 1 segundo antes de tentar novamente
+        
+    try:
+        geolocator = Nominatim(user_agent="cmb_capital_app", timeout=10)
+        
+        # Lista de tentativas de formatação do endereço
+        address_attempts = [
+            f"{address}, Eusébio, Ceará, Brasil",
+            f"{address}, Eusébio, CE",
+            f"{address}, Eusébio",
+        ]
+        
+        for attempt in address_attempts:
+            try:
+                location = geolocator.geocode(attempt)
+                if location:
+                    # Verifica se as coordenadas estão dentro dos limites de Eusébio
+                    if (-4.50 <= location.latitude <= -3.80 and 
+                        -38.60 <= location.longitude <= -38.30):
+                        return location.latitude, location.longitude
+                time.sleep(1)  # Espera entre tentativas
+            except (GeocoderTimedOut, GeocoderServiceError) as e:
+                st.warning(f"Erro ao geocodificar endereço: {attempt} - {str(e)}")
+                time.sleep(2)  # Espera maior em caso de erro
+                continue
+                
+        st.warning(f"Não foi possível encontrar coordenadas para: {address}")
+        return None
+        
+    except Exception as e:
+        st.error(f"Erro inesperado na geocodificação: {str(e)}")
         return None
 
 def main():
@@ -71,16 +92,41 @@ def main():
         df_mapa = pd.DataFrame()
         
         with st.spinner("Obtendo coordenadas dos endereços..."):
+            # Cria uma barra de progresso
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
             coordenadas = []
-            for endereco in df_recente['endereco']:
+            total_enderecos = len(df_recente)
+            
+            for idx, endereco in enumerate(df_recente['endereco']):
+                # Atualiza a barra de progresso
+                progress = (idx + 1) / total_enderecos
+                progress_bar.progress(progress)
+                status_text.text(f"Processando endereço {idx + 1} de {total_enderecos}")
+                
                 coords = get_coordinates(endereco)
                 if coords:
                     coordenadas.append(coords)
+                    st.success(f"✅ Coordenadas encontradas para: {endereco}")
                 else:
                     coordenadas.append((None, None))
-            
+                    st.warning(f"⚠️ Não foi possível encontrar coordenadas para: {endereco}")
+                
             df_mapa['LAT'] = [coord[0] if coord else None for coord in coordenadas]
             df_mapa['LON'] = [coord[1] if coord else None for coord in coordenadas]
+            
+            status_text.empty()
+            progress_bar.empty()
+            
+            # Mostra estatísticas da geocodificação
+            total_sucesso = df_mapa['LAT'].notna().sum()
+            st.info(f"""
+            📊 Estatísticas da geocodificação:
+            - Total de endereços processados: {total_enderecos}
+            - Endereços geocodificados com sucesso: {total_sucesso}
+            - Taxa de sucesso: {(total_sucesso/total_enderecos)*100:.1f}%
+            """)
         
         # Remove linhas com coordenadas nulas
         df_mapa = df_mapa.dropna()
