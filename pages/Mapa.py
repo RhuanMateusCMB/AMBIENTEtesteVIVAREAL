@@ -88,7 +88,26 @@ def main():
     df = db.obter_dados()
 
     if not df.empty:
-        # Filtros
+        # Verificar se todos os registros têm coordenadas
+        registros_sem_coordenadas = df[df['latitude'].isna() | df['longitude'].isna()]
+        total_registros = len(df)
+        registros_com_coordenadas = total_registros - len(registros_sem_coordenadas)
+        
+        # Mostrar progresso de coordenadas carregadas
+        progress_bar = st.progress(registros_com_coordenadas / total_registros)
+        status_text = st.empty()
+        status_text.text(f"Coordenadas carregadas: {registros_com_coordenadas}/{total_registros}")
+        
+        # Se houver registros sem coordenadas, mostrar mensagem e não exibir o mapa
+        if not registros_sem_coordenadas.empty:
+            st.warning("⚠️ Alguns registros ainda não possuem coordenadas. Por favor, processe as coordenadas na página principal antes de visualizar o mapa.")
+            return
+            
+        # Se todas as coordenadas estiverem carregadas, limpar barra de progresso e status
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Continuar com os filtros
         col1, col2, col3 = st.columns(3)
         
         with col1:
