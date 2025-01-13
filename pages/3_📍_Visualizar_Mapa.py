@@ -24,7 +24,7 @@ def get_data():
     """Função para buscar dados do Supabase"""
     try:
         supabase = init_connection()
-        response = supabase.table('imoveisatual').select('*').execute()
+        response = supabase.table('teste').select('*').execute()
         return pd.DataFrame(response.data)
     except Exception as e:
         st.error(f"Erro ao buscar dados: {str(e)}")
