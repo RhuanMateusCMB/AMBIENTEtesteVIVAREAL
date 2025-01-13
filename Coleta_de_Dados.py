@@ -31,17 +31,64 @@ from supabase import create_client
 def obter_coordenadas(endereco: str) -> tuple:
     try:
         endereco_completo = f"{endereco}, Eusébio, CE, Brasil"
-        geolocator = Nominatim(user_agent="cmb_capital_app")
+        geolocator = Nominatim(
+            user_agent="cmb_capital_app",
+            timeout=5
+        )
         location = geolocator.geocode(endereco_completo)
-        time.sleep(1)
         
         if location:
             return location.latitude, location.longitude
+            
+        # Se não encontrar o endereço completo, tenta só com o bairro
+        bairro = endereco.split(' - ')[-1].split(',')[0] if ' - ' in endereco else None
+        if bairro:
+            location = geolocator.geocode(f"{bairro}, Eusébio, CE, Brasil")
+            if location:
+                return location.latitude, location.longitude
+                
         return None, None
         
     except Exception as e:
         print(f"Erro ao obter coordenadas para {endereco}: {str(e)}")
         return None, None
+
+def processar_coordenadas_em_lote(df: pd.DataFrame) -> pd.DataFrame:
+    """Processa as coordenadas em lote após a coleta dos dados"""
+    
+    # Adiciona as colunas de latitude e longitude se não existirem
+    if 'latitude' not in df.columns:
+        df['latitude'] = None
+    if 'longitude' not in df.columns:
+        df['longitude'] = None
+    
+    total_enderecos = len(df)
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for idx, row in df.iterrows():
+        # Atualiza a barra de progresso
+        progress = (idx + 1) / total_enderecos
+        progress_bar.progress(progress)
+        status_text.text(f"Processando coordenadas: {idx + 1}/{total_enderecos}")
+        
+        # Pula se já tiver coordenadas
+        if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+            continue
+        
+        # Obtém as coordenadas
+        lat, lon = obter_coordenadas(row['endereco'])
+        
+        # Atualiza o DataFrame
+        df.at[idx, 'latitude'] = lat
+        df.at[idx, 'longitude'] = lon
+        
+        # Espera 2 segundos entre as requisições para evitar limites de taxa
+        time.sleep(2)
+    
+    progress_bar.empty()
+    status_text.empty()
+    return df
 
 # Configuração da página Streamlit
 st.set_page_config(
@@ -387,7 +434,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 3) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 10) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -524,7 +571,7 @@ def main():
         # Informações sobre a coleta
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 3 páginas de resultados
+        - Serão coletadas 10 páginas de resultados
         - Apenas terrenos em Eusébio/CE
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
@@ -557,6 +604,12 @@ def main():
                 st.metric("Área Média", f"{area_media:,.2f} m²")
             
             st.success("✅ Dados coletados com sucesso!")
+            
+            # Botão para processar coordenadas
+            if st.button("🌍 Processar Coordenadas", use_container_width=True):
+                with st.spinner("Processando coordenadas dos endereços..."):
+                    df = processar_coordenadas_em_lote(df)
+                st.success("✅ Coordenadas processadas com sucesso!")
             
             # Exibição dos dados
             st.markdown("### 📊 Dados Coletados")
