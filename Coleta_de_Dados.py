@@ -573,6 +573,24 @@ def main():
                                 st.session_state.dados_salvos = True
                                 st.success("✅ Dados salvos no banco de dados!")
                                 st.balloons()
+                                # Após salvar os dados no banco
+                                if st.session_state.dados_salvos:
+                                    st.success("✅ Dados salvos com sucesso!")
+                                    st.markdown("""
+                                        <a href="/Visualizar_Mapa" target="_self">
+                                            <button style="
+                                                background-color: #FF4B4B;
+                                                color: white;
+                                                padding: 0.5rem 1rem;
+                                                border: none;
+                                                border-radius: 5px;
+                                                cursor: pointer;
+                                                margin: 1rem 0;
+                                            ">
+                                                📍 Visualizar no Mapa
+                                            </button>
+                                        </a>
+                                    """, unsafe_allow_html=True)
                         except Exception as e:
                             st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
                 
