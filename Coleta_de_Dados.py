@@ -22,8 +22,26 @@ from typing import Optional, List, Dict
 from dataclasses import dataclass
 import hashlib
 
+# Biblioteca para geocodificação
+from geopy.geocoders import Nominatim
+
 # Biblioteca para conexão com Supabase
 from supabase import create_client
+
+def obter_coordenadas(endereco: str) -> tuple:
+    try:
+        endereco_completo = f"{endereco}, Eusébio, CE, Brasil"
+        geolocator = Nominatim(user_agent="cmb_capital_app")
+        location = geolocator.geocode(endereco_completo)
+        time.sleep(1)
+        
+        if location:
+            return location.latitude, location.longitude
+        return None, None
+        
+    except Exception as e:
+        print(f"Erro ao obter coordenadas para {endereco}: {str(e)}")
+        return None, None
 
 # Configuração da página Streamlit
 st.set_page_config(
@@ -120,7 +138,6 @@ def login_page():
             else:
                 st.error("Email ou senha incorretos!")
 
-
 @dataclass
 class ConfiguracaoScraper:
     tempo_espera: int = 8
@@ -137,10 +154,7 @@ class SupabaseManager:
 
     def verificar_credenciais(self, email: str, senha: str) -> bool:
         try:
-            # Hash da senha para comparação segura
             senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-            
-            # Busca o usuário com o email fornecido
             response = self.supabase.table('usuarios').select('*').eq('email', email).execute()
             
             if response.data and len(response.data) > 0:
@@ -155,17 +169,12 @@ class SupabaseManager:
         self.supabase.table('teste').delete().neq('id', 0).execute()
 
     def inserir_dados(self, df):
-        # Primeiro, pegamos o maior ID atual na tabela
         result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
-        # Ajustamos os IDs do novo dataframe
         df['id'] = df['id'].apply(lambda x: x + ultimo_id)
-        
-        # Convertemos a coluna data_coleta para o formato correto
         df['data_coleta'] = pd.to_datetime(df['data_coleta']).dt.strftime('%Y-%m-%d')
         
-        # Agora inserimos os dados
         registros = df.to_dict('records')
         self.supabase.table('teste').insert(registros).execute()
 
@@ -200,13 +209,11 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
             opcoes_chrome.add_argument('--enable-javascript')
             
-            # Headers mais realistas
             user_agent = self._get_random_user_agent()
             opcoes_chrome.add_argument(f'--user-agent={user_agent}')
             opcoes_chrome.add_argument('--accept-language=pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7')
             opcoes_chrome.add_argument('--accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8')
             
-            # Configurações adicionais
             opcoes_chrome.add_argument('--disable-notifications')
             opcoes_chrome.add_argument('--disable-popup-blocking')
             opcoes_chrome.add_argument('--disable-extensions')
@@ -215,13 +222,11 @@ class ScraperVivaReal:
             service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
             
-            # Configurações adicionais para evitar detecção
             navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
                 "userAgent": user_agent,
                 "platform": "Windows NT 10.0; Win64; x64"
             })
             
-            # Adicionar propriedades ao objeto navigator
             navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             navegador.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt']})")
             navegador.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
@@ -344,6 +349,9 @@ class ScraperVivaReal:
                 self.logger.warning(f"Dados incompletos para imóvel ID {id_global}: Preço={preco}, Área={area}")
                 return None
 
+            # Obtém as coordenadas do endereço
+            latitude, longitude = obter_coordenadas(endereco)
+
             return {
                 'id': id_global,
                 'titulo': titulo,
@@ -355,7 +363,9 @@ class ScraperVivaReal:
                 'pagina': pagina,
                 'data_coleta': datetime.now().strftime("%Y-%m-%d"),
                 'estado': '',
-                'localidade': ''
+                'localidade': '',
+                'latitude': latitude,
+                'longitude': longitude
             }
 
         except Exception as e:
@@ -554,7 +564,9 @@ def main():
                 df.style.format({
                     'preco_real': 'R$ {:,.2f}',
                     'preco_m2': 'R$ {:,.2f}',
-                    'area_m2': '{:,.2f} m²'
+                    'area_m2': '{:,.2f} m²',
+                    'latitude': '{:.6f}',
+                    'longitude': '{:.6f}'
                 }),
                 use_container_width=True
             )
