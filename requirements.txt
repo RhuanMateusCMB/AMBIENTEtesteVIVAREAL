@@ -5,5 +5,3 @@ supabase~=1.2.0
 python-dotenv~=1.0.0
 plotly
 geopy==2.4.1
-folium==0.15.1
-streamlit-folium==0.15.0
