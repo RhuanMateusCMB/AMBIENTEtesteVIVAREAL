@@ -6,3 +6,4 @@ python-dotenv~=1.0.0
 plotly
 geopy==2.4.1
 folium
+streamlit-folium
