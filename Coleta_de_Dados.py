@@ -613,11 +613,11 @@ def main():
                                 st.balloons()
                         except Exception as e:
                             st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
-    
-    with col3:
-        if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
-            st.session_state.dados_salvos = True
-            st.info("📝 Dados não foram salvos no banco.")
+                
+                with col3:
+                    if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
+                        st.session_state.dados_salvos = True
+                        st.info("📝 Dados não foram salvos no banco.")
             
             # Botão de download
             csv = df.to_csv(index=False).encode('utf-8-sig')
