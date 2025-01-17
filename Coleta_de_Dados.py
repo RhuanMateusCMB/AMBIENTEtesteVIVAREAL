@@ -21,6 +21,7 @@ import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
 import hashlib
+from geopy.geocoders import Nominatim
 
 # Biblioteca para conexão com Supabase
 from supabase import create_client
