@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 import hashlib
 
@@ -154,24 +155,25 @@ def criar_graficos(df_filtrado):
    st.plotly_chart(fig_scatter, use_container_width=True)
 
    # Box plot
-   fig_box = px.box(
-       df_filtrado,
-       y='preco_m2', 
-       title='Distribuição dos Preços por m²',
-       labels={'preco_m2': 'Preço por m² (R$)'}
+   fig_box = go.Figure()
+   
+   fig_box.add_trace(go.Box(
+       y=df_filtrado['preco_real'],
+       name='Preço Total',
+       hovertemplate="<b>Preço:</b> R$ %{y:.2f}<extra></extra>"
+   ))
+   
+   fig_box.add_trace(go.Box(
+       y=df_filtrado['area_m2'],
+       name='Área',
+       hovertemplate="<b>Área:</b> %{y:.2f} m²<extra></extra>"
+   ))
+   
+   fig_box.update_layout(
+       title='Distribuição de Preços e Áreas',
+       yaxis_title='Valores'
    )
-
-   fig_box.update_traces(
-       boxmean=True,
-       hovertemplate="""
-       <b>Máximo:</b> R$ %{upperbound:.2f}/m²<br>
-       <b>Q3:</b> R$ %{q3:.2f}/m²<br>
-       <b>Mediana:</b> R$ %{median:.2f}/m²<br>
-       <b>Média:</b> R$ %{mean:.2f}/m²<br>
-       <b>Q1:</b> R$ %{q1:.2f}/m²<br>
-       <b>Mínimo:</b> R$ %{lowerbound:.2f}/m²<extra></extra>
-       """
-   )
+   
    st.plotly_chart(fig_box, use_container_width=True)
 
    # Histograma
