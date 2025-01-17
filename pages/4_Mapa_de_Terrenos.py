@@ -2,6 +2,7 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 import pandas as pd
+from supabase import create_client
 
 def criar_mapa_terrenos(df):
     # Verificar se existem coordenadas válidas
@@ -41,42 +42,39 @@ def criar_mapa_terrenos(df):
 def main():
     st.title("🗺️ Mapa de Terrenos em Eusébio")
     
-    # Carregar dados
-    df = st.session_state.get('df')
+    # Configuração do Supabase
+    supabase_url = st.secrets["SUPABASE_URL"]
+    supabase_key = st.secrets["SUPABASE_KEY"]
+    supabase = create_client(supabase_url, supabase_key)
     
-    if df is not None:
-        # Verificar se já processou coordenadas
-        if 'latitude' not in df.columns or df['latitude'].isna().all():
-            st.warning("É necessário processar as coordenadas primeiro.")
-            if st.button("Processar Coordenadas"):
-                with st.spinner("Processando coordenadas..."):
-                    df = processar_coordenadas_em_lote(df)
-                    st.session_state.df = df
-                    st.experimental_rerun()
-        else:
-            # Criar mapa
-            mapa = criar_mapa_terrenos(df)
+    # Obter dados do Supabase
+    response = supabase.table("teste").select("*").execute()
+    df = pd.DataFrame(response.data)
+    
+    if not df.empty:
+        # Criar mapa
+        mapa = criar_mapa_terrenos(df)
+        
+        if mapa:
+            # Exibir mapa
+            st_folium(mapa, width=725, height=500)
             
-            if mapa:
-                # Exibir mapa
-                st_folium(mapa, width=725, height=500)
-                
-                # Estatísticas do mapa
-                st.subheader("📊 Estatísticas dos Terrenos Mapeados")
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("Total de Terrenos", len(df[df['latitude'].notna()]))
-                
-                with col2:
-                    preco_medio = df[df['latitude'].notna()]['preco_real'].mean()
-                    st.metric("Preço Médio", f"R$ {preco_medio:,.2f}")
-                
-                with col3:
-                    area_media = df[df['latitude'].notna()]['area_m2'].mean()
-                    st.metric("Área Média", f"{area_media:,.2f} m²")
+            # Estatísticas do mapa
+            st.subheader("📊 Estatísticas dos Terrenos Mapeados")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total de Terrenos", len(df[df['latitude'].notna()]))
+            
+            with col2:
+                preco_medio = df[df['latitude'].notna()]['preco_real'].mean()
+                st.metric("Preço Médio", f"R$ {preco_medio:,.2f}")
+            
+            with col3:
+                area_media = df[df['latitude'].notna()]['area_m2'].mean()
+                st.metric("Área Média", f"{area_media:,.2f} m²")
     else:
-        st.warning("Primeiro, colete os dados no módulo de Coleta de Dados.")
+        st.warning("Não há dados disponíveis no Supabase para exibir no mapa.")
 
 if __name__ == "__main__":
     main()
