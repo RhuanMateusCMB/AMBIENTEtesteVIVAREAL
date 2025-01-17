@@ -502,6 +502,43 @@ def obter_coordenadas(endereco: str) -> tuple:
         print(f"Erro ao obter coordenadas para {endereco}: {str(e)}")
         return None, None
 
+def processar_coordenadas_em_lote(df: pd.DataFrame) -> pd.DataFrame:
+    """Processa as coordenadas em lote após a coleta dos dados"""
+    
+    # Adiciona as colunas de latitude e longitude se não existirem
+    if 'latitude' not in df.columns:
+        df['latitude'] = None
+    if 'longitude' not in df.columns:
+        df['longitude'] = None
+    
+    total_enderecos = len(df)
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for idx, row in df.iterrows():
+        # Atualiza a barra de progresso
+        progress = (idx + 1) / total_enderecos
+        progress_bar.progress(progress)
+        status_text.text(f"Processando coordenadas: {idx + 1}/{total_enderecos}")
+        
+        # Pula se já tiver coordenadas
+        if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+            continue
+        
+        # Obtém as coordenadas
+        lat, lon = obter_coordenadas(row['endereco'])
+        
+        # Atualiza o DataFrame
+        df.at[idx, 'latitude'] = lat
+        df.at[idx, 'longitude'] = lon
+        
+        # Espera 2 segundos entre as requisições para evitar limites de taxa
+        time.sleep(2)
+    
+    progress_bar.empty()
+    status_text.empty()
+    return df
+
 def main():
     try:
         # Verifica o estado do login
