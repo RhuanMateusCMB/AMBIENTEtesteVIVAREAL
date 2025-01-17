@@ -143,48 +143,55 @@ def exibir_metricas(df):
         st.metric("Preço/m² Médio", f"R$ {preco_m2_medio:,.2f}")
 
 def criar_graficos(df_filtrado):
-   # Gráfico de dispersão
-   fig_scatter = px.scatter(
-       df_filtrado,
-       x='area_m2',
-       y='preco_real',
-       title='Relação entre Área e Preço',
-       labels={'area_m2': 'Área (m²)', 'preco_real': 'Preço (R$)'},
-       hover_data=['endereco', 'preco_m2']
-   )
-   st.plotly_chart(fig_scatter, use_container_width=True)
+    # Gráfico de dispersão (mantém igual)
+    fig_scatter = px.scatter(
+        df_filtrado,
+        x='area_m2',
+        y='preco_real',
+        title='Relação entre Área e Preço',
+        labels={'area_m2': 'Área (m²)', 'preco_real': 'Preço (R$)'},
+        hover_data=['endereco', 'preco_m2']
+    )
+    st.plotly_chart(fig_scatter, use_container_width=True)
 
-   # Box plot
-   fig_box = go.Figure()
-   
-   fig_box.add_trace(go.Box(
-       y=df_filtrado['preco_real'],
-       name='Preço Total',
-       hovertemplate="<b>Preço:</b> R$ %{y:.2f}<extra></extra>"
-   ))
-   
-   fig_box.add_trace(go.Box(
-       y=df_filtrado['area_m2'],
-       name='Área',
-       hovertemplate="<b>Área:</b> %{y:.2f} m²<extra></extra>"
-   ))
-   
-   fig_box.update_layout(
-       title='Distribuição de Preços e Áreas',
-       yaxis_title='Valores'
-   )
-   
-   st.plotly_chart(fig_box, use_container_width=True)
+    # Box plots separados
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig_box_preco = go.Figure()
+        fig_box_preco.add_trace(go.Box(
+            y=df_filtrado['preco_real'],
+            name='Preço Total',
+            hovertemplate="<b>Preço:</b> R$ %{y:,.2f}<extra></extra>"
+        ))
+        fig_box_preco.update_layout(
+            title='Distribuição dos Preços',
+            yaxis_title='Preço (R$)'
+        )
+        st.plotly_chart(fig_box_preco, use_container_width=True)
+    
+    with col2:
+        fig_box_area = go.Figure()
+        fig_box_area.add_trace(go.Box(
+            y=df_filtrado['area_m2'],
+            name='Área',
+            hovertemplate="<b>Área:</b> %{y:.2f} m²<extra></extra>"
+        ))
+        fig_box_area.update_layout(
+            title='Distribuição das Áreas',
+            yaxis_title='Área (m²)'
+        )
+        st.plotly_chart(fig_box_area, use_container_width=True)
 
-   # Histograma
-   fig_hist = px.histogram(
-       df_filtrado,
-       x='preco_m2',
-       title='Distribuição de Preços por m²',
-       labels={'preco_m2': 'Preço por m² (R$)', 'count': 'Quantidade'},
-       nbins=30
-   )
-   st.plotly_chart(fig_hist, use_container_width=True)
+    # Histograma (mantém igual)
+    fig_hist = px.histogram(
+        df_filtrado,
+        x='preco_m2',
+        title='Distribuição de Preços por m²',
+        labels={'preco_m2': 'Preço por m² (R$)', 'count': 'Quantidade'},
+        nbins=30
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
 
 def main():
     check_login()
