@@ -477,6 +477,31 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
+def obter_coordenadas(endereco: str) -> tuple:
+    try:
+        endereco_completo = f"{endereco}, Eusébio, CE, Brasil"
+        geolocator = Nominatim(
+            user_agent="cmb_capital_app",
+            timeout=5
+        )
+        location = geolocator.geocode(endereco_completo)
+        
+        if location:
+            return location.latitude, location.longitude
+            
+        # Se não encontrar o endereço completo, tenta só com o bairro
+        bairro = endereco.split(' - ')[-1].split(',')[0] if ' - ' in endereco else None
+        if bairro:
+            location = geolocator.geocode(f"{bairro}, Eusébio, CE, Brasil")
+            if location:
+                return location.latitude, location.longitude
+                
+        return None, None
+        
+    except Exception as e:
+        print(f"Erro ao obter coordenadas para {endereco}: {str(e)}")
+        return None, None
+
 def main():
     try:
         # Verifica o estado do login
@@ -562,12 +587,13 @@ def main():
             # Confirmação para salvar no banco
             if not st.session_state.dados_salvos:
                 st.markdown("### 💾 Salvar no Banco de Dados")
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    if st.button("✅ Sim, salvar dados", key='save_button', use_container_width=True):
+                    if st.button("✅ Salvar com Coordenadas", key='save_with_coords_button', use_container_width=True):
                         try:
                             with st.spinner("💾 Salvando dados no banco..."):
+                                df = processar_coordenadas_em_lote(df)
                                 db = SupabaseManager()
                                 db.inserir_dados(df)
                                 st.session_state.dados_salvos = True
@@ -577,9 +603,21 @@ def main():
                             st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
                 
                 with col2:
-                    if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
-                        st.session_state.dados_salvos = True
-                        st.info("📝 Dados não foram salvos no banco.")
+                    if st.button("✅ Salvar sem Coordenadas", key='save_without_coords_button', use_container_width=True):
+                        try:
+                            with st.spinner("💾 Salvando dados no banco..."):
+                                db = SupabaseManager()
+                                db.inserir_dados(df)
+                                st.session_state.dados_salvos = True
+                                st.success("✅ Dados salvos no banco de dados!")
+                                st.balloons()
+                        except Exception as e:
+                            st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
+    
+    with col3:
+        if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
+            st.session_state.dados_salvos = True
+            st.info("📝 Dados não foram salvos no banco.")
             
             # Botão de download
             csv = df.to_csv(index=False).encode('utf-8-sig')
