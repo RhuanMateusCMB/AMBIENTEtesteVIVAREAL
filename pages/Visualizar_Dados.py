@@ -142,7 +142,7 @@ def exibir_metricas(df):
         st.metric("Preço/m² Médio", f"R$ {preco_m2_medio:,.2f}")
 
 def criar_graficos(df_filtrado):
-    # Gráfico de dispersão: Preço x Área
+    # Gráficos existentes
     fig_scatter = px.scatter(
         df_filtrado,
         x='area_m2',
@@ -153,7 +153,16 @@ def criar_graficos(df_filtrado):
     )
     st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # Distribuição de preços por m²
+    # Novo box plot
+    fig_box = px.box(
+        df_filtrado,
+        y='preco_m2',
+        title='Distribuição dos Preços por m²',
+        labels={'preco_m2': 'Preço por m² (R$)'}
+    )
+    st.plotly_chart(fig_box, use_container_width=True)
+
+    # Histograma existente
     fig_hist = px.histogram(
         df_filtrado,
         x='preco_m2',
