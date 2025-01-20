@@ -393,45 +393,64 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
-def enviar_email(total_dados):
-    try:
-        # Carregar credenciais do arquivo pickle
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-        
-        service = build('gmail', 'v1', credentials=creds)
-        
-        # Criar mensagem
-        mensagem = MIMEText(f'Coleta finalizada. Total de {total_dados} registros coletados.')
-        mensagem['to'] = 'rhuan.apple27@gmail.com'  # Substituir pelo email destino
-        mensagem['subject'] = f'Coleta de Dados - {datetime.now().strftime("%d/%m/%Y")}'
-        
-        # Codificar mensagem
-        raw = base64.urlsafe_b64encode(mensagem.as_bytes()).decode()
-        
-        # Enviar email
-        service.users().messages().send(userId='me', body={'raw': raw}).execute()
-        
-    except Exception as e:
-        logging.error(f"Erro ao enviar email: {str(e)}")
+def gerar_token():
+   """Gera o token de autenticação do Gmail"""
+   SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+   creds = None
 
-# Modificar a função scheduled_job() para incluir o envio de e-mail
+   if os.path.exists('token.pickle'):
+       with open('token.pickle', 'rb') as token:
+           creds = pickle.load(token)
+
+   if not creds or not creds.valid:
+       if creds and creds.expired and creds.refresh_token:
+           creds.refresh(Request())
+       else:
+           flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+           creds = flow.run_local_server(port=0)
+       
+       with open('token.pickle', 'wb') as token:
+           pickle.dump(creds, token)
+
+   return creds
+
+def enviar_email(total_dados):
+   """Envia email usando Gmail API"""
+   try:
+       creds = gerar_token()
+       service = build('gmail', 'v1', credentials=creds)
+       
+       mensagem = MIMEText(f'Coleta finalizada. Total de {total_dados} registros coletados.')
+       mensagem['to'] = 'rhuan.apple27@gmail.com'
+       mensagem['subject'] = f'Coleta de Dados - {datetime.now().strftime("%d/%m/%Y")}'
+       
+       raw = base64.urlsafe_b64encode(mensagem.as_bytes()).decode()
+       
+       try:
+           service.users().messages().send(userId='me', body={'raw': raw}).execute()
+           logging.info("Email enviado com sucesso")
+       except Exception as e:
+           logging.error(f"Erro ao enviar email: {str(e)}")
+           
+   except Exception as e:
+       logging.error(f"Erro na configuração do email: {str(e)}")
+
 def scheduled_job():
-    try:
-        config = ConfiguracaoScraper()
-        scraper = ScraperVivaReal(config)
-        df = scraper.coletar_dados()
-        if df is not None:
-            db = SupabaseManager()
-            db.inserir_dados(df)
-            total_dados = len(df)
-            enviar_email(total_dados)
-            st.success("Coleta automática concluída")
-            return True
-        return False
-    except Exception as e:
-        logging.error(f"Erro na coleta: {str(e)}")
-        return False
+   try:
+       config = ConfiguracaoScraper()
+       scraper = ScraperVivaReal(config)
+       df = scraper.coletar_dados()
+       if df is not None:
+           db = SupabaseManager()
+           db.inserir_dados(df)
+           total_dados = len(df)
+           enviar_email(total_dados)
+           st.success("Coleta automática concluída")
+           return True
+       return False
+   except Exception as e:
+       logging.error(f"Erro na coleta: {str(e)}")
+       return False
 
 def main():
     try:
@@ -452,24 +471,24 @@ def main():
         """)
         
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            with st.spinner("Iniciando coleta de dados..."):
-                config = ConfiguracaoScraper()
-                scraper = ScraperVivaReal(config)
-                df = scraper.coletar_dados()
-                
-                if df is not None:
-                    try:
-                        db = SupabaseManager()
-                        db.inserir_dados(df)
-                        total_dados = len(df)
-                        enviar_email(total_dados)
-                        st.success("✅ Dados coletados e salvos com sucesso!")
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar no banco: {str(e)}")
-        
+           with st.spinner("Iniciando coleta de dados..."):
+               config = ConfiguracaoScraper()
+               scraper = ScraperVivaReal(config)
+               df = scraper.coletar_dados()
+               
+               if df is not None:
+                   try:
+                       db = SupabaseManager()
+                       db.inserir_dados(df)
+                       total_dados = len(df)
+                       enviar_email(total_dados)
+                       st.success("✅ Dados coletados e salvos com sucesso!")
+                       st.balloons()
+                   except Exception as e:
+                       st.error(f"Erro ao salvar no banco: {str(e)}")
+       
     except Exception as e:
-        st.error(f"❌ Erro inesperado: {str(e)}")
+       st.error(f"❌ Erro inesperado: {str(e)}")
 
 if __name__ == "__main__":
     main()
