@@ -25,7 +25,6 @@ import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
 import hashlib
-from geopy.geocoders import Nominatim
 
 # Biblioteca para conexão com Supabase
 from supabase import create_client
@@ -490,10 +489,11 @@ def scheduled_job():
         if df is not None:
             db = SupabaseManager()
             db.inserir_dados(df)
+            st.success("Coleta automática concluída")
             return True
         return False
     except Exception as e:
-        st.error(f"Erro na coleta: {str(e)}")
+        logging.error(f"Erro na coleta: {str(e)}")
         return False
 
 def main():
@@ -511,15 +511,11 @@ def main():
             st.header("⚙️ Coleta Automática")
             auto_collect = st.checkbox("Ativar coleta automática")
             if auto_collect:
-                intervalo = st.number_input("Intervalo (minutos)", 
-                                          min_value=1, 
-                                          max_value=60, 
-                                          value=10)
+                intervalo = st.number_input("Intervalo (minutos)", min_value=1, max_value=60, value=10)
                 if st.button("Iniciar Agendamento"):
                     schedule.every(intervalo).minutes.do(scheduled_job)
                     st.success(f"Coleta agendada a cada {intervalo} minutos")
                     
-                    # Monitor de execução
                     status_placeholder = st.empty()
                     while True:
                         schedule.run_pending()
