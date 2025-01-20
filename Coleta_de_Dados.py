@@ -7,9 +7,7 @@ import schedule
 import pandas as pd
 
 # Enviar email
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import yagmail
 
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
@@ -393,26 +391,15 @@ class ScraperVivaReal:
 
 def enviar_email(total_dados):
     try:
-        # Configurações do e-mail (substituir com suas credenciais)
         remetente = st.secrets["EMAIL_REMETENTE"]
         senha = st.secrets["EMAIL_SENHA"]
         destinatario = st.secrets["EMAIL_DESTINATARIO"]
 
-        # Criando a mensagem
-        mensagem = MIMEMultipart()
-        mensagem['From'] = remetente
-        mensagem['To'] = destinatario
-        mensagem['Assunto'] = 'Coleta de Dados Concluída'
-
-        corpo = f"Coleta de dados concluída! Total de dados coletados: {total_dados}"
-        mensagem.attach(MIMEText(corpo, 'plain'))
-
-        # Enviando o e-mail
-        with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
-            servidor.starttls()
-            servidor.login(remetente, senha)
-            servidor.send_message(mensagem)
-
+        yag = yagmail.SMTP(remetente, senha)
+        assunto = 'Coleta de Dados Concluída'
+        conteudo = f"Coleta de dados concluída! Total de dados coletados: {total_dados}"
+        
+        yag.send(to=destinatario, subject=assunto, contents=conteudo)
         return True
     except Exception as e:
         logging.error(f"Erro ao enviar e-mail: {str(e)}")
