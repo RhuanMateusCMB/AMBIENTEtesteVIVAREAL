@@ -5,10 +5,6 @@ import streamlit.components.v1 as components
 # Bibliotecas para manipulação de dados
 import pandas as pd
 
-# Rotina de Coleta
-import schedule
-from datetime import datetime, timedelta
-
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -20,7 +16,7 @@ from selenium.webdriver.chrome.service import Service
 # Bibliotecas utilitárias
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
@@ -388,21 +384,6 @@ class ScraperVivaReal:
                     navegador.quit()
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
-
-def scheduled_job():
-    try:
-        config = ConfiguracaoScraper()
-        scraper = ScraperVivaReal(config)
-        df = scraper.coletar_dados()
-        if df is not None:
-            db = SupabaseManager()
-            db.inserir_dados(df)
-            st.success("Coleta automática concluída")
-            return True
-        return False
-    except Exception as e:
-        logging.error(f"Erro na coleta: {str(e)}")
-        return False
 
 def main():
     try:
