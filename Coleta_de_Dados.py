@@ -297,7 +297,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 10) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 1) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -474,7 +474,7 @@ def main():
         
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 10 páginas de resultados
+        - Serão coletadas 1 páginas de resultados
         - Apenas terrenos em Eusébio/CE
         """)
         
