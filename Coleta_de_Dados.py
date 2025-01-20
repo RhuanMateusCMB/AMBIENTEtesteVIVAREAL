@@ -7,7 +7,11 @@ import schedule
 import pandas as pd
 
 # Enviar email
-import yagmail
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from base64 import urlsafe_b64encode
+from email.mime.text import MIMEText
+import base64
 
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
