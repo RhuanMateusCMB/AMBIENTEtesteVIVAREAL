@@ -4,7 +4,6 @@ pandas~=2.1.4
 supabase~=1.2.0
 python-dotenv~=1.0.0
 plotly
-geopy==2.4.1
 folium
 streamlit-folium
 schedule
