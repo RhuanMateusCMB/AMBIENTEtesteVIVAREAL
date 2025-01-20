@@ -12,6 +12,10 @@ from googleapiclient.discovery import build
 from base64 import urlsafe_b64encode
 from email.mime.text import MIMEText
 import base64
+import os
+import pickle
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
