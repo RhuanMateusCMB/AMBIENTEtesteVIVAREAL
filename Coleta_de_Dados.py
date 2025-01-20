@@ -398,25 +398,29 @@ class ScraperVivaReal:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
 def gerar_token():
-   """Gera o token de autenticação do Gmail"""
-   SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-   creds = None
+    SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+    creds = None
+    
+    credentials_dict = json.loads(st.secrets["GMAIL_CREDENTIALS"])
+    
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
 
-   if os.path.exists('token.pickle'):
-       with open('token.pickle', 'rb') as token:
-           creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_config(
+                credentials_dict, 
+                SCOPES
+            )
+            creds = flow.run_local_server(port=0)
+        
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
 
-   if not creds or not creds.valid:
-       if creds and creds.expired and creds.refresh_token:
-           creds.refresh(Request())
-       else:
-           flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-           creds = flow.run_local_server(port=0)
-       
-       with open('token.pickle', 'wb') as token:
-           pickle.dump(creds, token)
-
-   return creds
+    return creds
 
 def enviar_email(total_dados):
    """Envia email usando Gmail API"""
