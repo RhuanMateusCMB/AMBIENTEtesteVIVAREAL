@@ -489,75 +489,12 @@ def scheduled_job():
         df = scraper.coletar_dados()
         if df is not None:
             db = SupabaseManager()
-            df = processar_coordenadas_em_lote(df)
             db.inserir_dados(df)
             return True
         return False
     except Exception as e:
-        st.error(f"Erro na coleta automática: {str(e)}")
+        st.error(f"Erro na coleta: {str(e)}")
         return False
-
-def obter_coordenadas(endereco: str) -> tuple:
-    try:
-        endereco_completo = f"{endereco}, Eusébio, CE, Brasil"
-        geolocator = Nominatim(
-            user_agent="cmb_capital_app",
-            timeout=5
-        )
-        location = geolocator.geocode(endereco_completo)
-        
-        if location:
-            return location.latitude, location.longitude
-            
-        # Se não encontrar o endereço completo, tenta só com o bairro
-        bairro = endereco.split(' - ')[-1].split(',')[0] if ' - ' in endereco else None
-        if bairro:
-            location = geolocator.geocode(f"{bairro}, Eusébio, CE, Brasil")
-            if location:
-                return location.latitude, location.longitude
-                
-        return None, None
-        
-    except Exception as e:
-        print(f"Erro ao obter coordenadas para {endereco}: {str(e)}")
-        return None, None
-
-def processar_coordenadas_em_lote(df: pd.DataFrame) -> pd.DataFrame:
-    """Processa as coordenadas em lote após a coleta dos dados"""
-    
-    # Adiciona as colunas de latitude e longitude se não existirem
-    if 'latitude' not in df.columns:
-        df['latitude'] = None
-    if 'longitude' not in df.columns:
-        df['longitude'] = None
-    
-    total_enderecos = len(df)
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for idx, row in df.iterrows():
-        # Atualiza a barra de progresso
-        progress = (idx + 1) / total_enderecos
-        progress_bar.progress(progress)
-        status_text.text(f"Processando coordenadas: {idx + 1}/{total_enderecos}")
-        
-        # Pula se já tiver coordenadas
-        if pd.notna(row['latitude']) and pd.notna(row['longitude']):
-            continue
-        
-        # Obtém as coordenadas
-        lat, lon = obter_coordenadas(row['endereco'])
-        
-        # Atualiza o DataFrame
-        df.at[idx, 'latitude'] = lat
-        df.at[idx, 'longitude'] = lon
-        
-        # Espera 2 segundos entre as requisições para evitar limites de taxa
-        time.sleep(2)
-    
-    progress_bar.empty()
-    status_text.empty()
-    return df
 
 def main():
     try:
@@ -665,46 +602,33 @@ def main():
             # Confirmação para salvar no banco
             if not st.session_state.dados_salvos:
                 st.markdown("### 💾 Salvar no Banco de Dados")
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 
                 with col1:
-                    if st.button("✅ Salvar com Coordenadas", key='save_with_coords_button', use_container_width=True):
+                    if st.button("✅ Salvar Dados", key='save_button', use_container_width=True):
                         try:
                             with st.spinner("💾 Salvando dados no banco..."):
-                                df = processar_coordenadas_em_lote(df)
                                 db = SupabaseManager()
                                 db.inserir_dados(df)
                                 st.session_state.dados_salvos = True
                                 st.success("✅ Dados salvos no banco de dados!")
                                 st.balloons()
                         except Exception as e:
-                            st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
+                            st.error(f"❌ Erro ao salvar: {str(e)}")
                 
                 with col2:
-                    if st.button("✅ Salvar sem Coordenadas", key='save_without_coords_button', use_container_width=True):
-                        try:
-                            with st.spinner("💾 Salvando dados no banco..."):
-                                db = SupabaseManager()
-                                db.inserir_dados(df)
-                                st.session_state.dados_salvos = True
-                                st.success("✅ Dados salvos no banco de dados!")
-                                st.balloons()
-                        except Exception as e:
-                            st.error(f"❌ Erro ao salvar no banco de dados: {str(e)}")
-                
-                with col3:
                     if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
                         st.session_state.dados_salvos = True
-                        st.info("📝 Dados não foram salvos no banco.")
-            
-            # Botão de download
-            csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Baixar dados em CSV",
-                data=csv,
-                file_name=f'terrenos_eusebio_{datetime.now().strftime("%Y%m%d")}.csv',
-                mime='text/csv',
-            )
+                        st.info("📝 Dados não foram salvos.")
+                        
+                        # Botão de download
+                        csv = df.to_csv(index=False).encode('utf-8-sig')
+                        st.download_button(
+                            label="📥 Baixar dados em CSV",
+                            data=csv,
+                            file_name=f'terrenos_eusebio_{datetime.now().strftime("%Y%m%d")}.csv',
+                            mime='text/csv',
+                        )
             
             if st.session_state.dados_salvos:
                 st.info("🔄 Para iniciar uma nova coleta, atualize a página.")
