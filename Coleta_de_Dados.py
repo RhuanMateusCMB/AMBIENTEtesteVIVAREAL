@@ -393,6 +393,28 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
+def enviar_email(total_dados):
+    try:
+        # Carregar credenciais do arquivo pickle
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+        
+        service = build('gmail', 'v1', credentials=creds)
+        
+        # Criar mensagem
+        mensagem = MIMEText(f'Coleta finalizada. Total de {total_dados} registros coletados.')
+        mensagem['to'] = 'rhuan.apple27@gmail.com'  # Substituir pelo email destino
+        mensagem['subject'] = f'Coleta de Dados - {datetime.now().strftime("%d/%m/%Y")}'
+        
+        # Codificar mensagem
+        raw = base64.urlsafe_b64encode(mensagem.as_bytes()).decode()
+        
+        # Enviar email
+        service.users().messages().send(userId='me', body={'raw': raw}).execute()
+        
+    except Exception as e:
+        logging.error(f"Erro ao enviar email: {str(e)}")
+
 # Modificar a função scheduled_job() para incluir o envio de e-mail
 def scheduled_job():
     try:
