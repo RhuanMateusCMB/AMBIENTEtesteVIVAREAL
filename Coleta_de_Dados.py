@@ -408,6 +408,20 @@ def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
         
+        st.markdown("""
+        <div style='text-align: center; padding: 1rem 0;'>
+            <p style='font-size: 1.2em; color: #666;'>
+                Coleta de dados de terrenos à venda em Eusébio, Ceará
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("""
+        ℹ️ **Informações sobre a coleta:**
+        - Serão coletadas 10 páginas de resultados
+        - Apenas terrenos em Eusébio/CE
+        """)
+        
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
             with st.spinner("Iniciando coleta de dados..."):
                 config = ConfiguracaoScraper()
