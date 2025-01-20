@@ -7,3 +7,5 @@ plotly
 folium
 streamlit-folium
 schedule
+secure-smtplib
+email
