@@ -393,22 +393,6 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
-def enviar_email(total_dados):
-    try:
-        remetente = st.secrets["EMAIL_REMETENTE"]
-        senha = st.secrets["EMAIL_SENHA"]
-        destinatario = st.secrets["EMAIL_DESTINATARIO"]
-
-        yag = yagmail.SMTP(remetente, senha)
-        assunto = 'Coleta de Dados Concluída'
-        conteudo = f"Coleta de dados concluída! Total de dados coletados: {total_dados}"
-        
-        yag.send(to=destinatario, subject=assunto, contents=conteudo)
-        return True
-    except Exception as e:
-        logging.error(f"Erro ao enviar e-mail: {str(e)}")
-        return False
-
 # Modificar a função scheduled_job() para incluir o envio de e-mail
 def scheduled_job():
     try:
