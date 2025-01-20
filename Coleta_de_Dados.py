@@ -24,9 +24,6 @@ from datetime import datetime
 import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
-import hashlib
-
-# Biblioteca para conexão com Supabase
 from supabase import create_client
 
 # Configuração da página Streamlit
@@ -48,30 +45,6 @@ st.markdown("""
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    .login-container {
-        max-width: 400px;
-        margin: auto;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        background-color: #1E1E1E;
-        border: 1px solid #333;
-    }
-    .login-title {
-        text-align: center;
-        margin-bottom: 2rem;
-        color: #FFFFFF;
-    }
-    /* Estilo para inputs */
-    .stTextInput>div>div>input {
-        background-color: #2D2D2D !important;
-        color: #FFFFFF !important;
-        border: 1px solid #444 !important;
-    }
-    /* Estilo para labels */
-    .stTextInput>label {
-        color: #CCCCCC !important;
-    }
     /* Estilo para botão de submit */
     .stButton>button {
         background-color: #FF4B4B !important;
@@ -85,45 +58,8 @@ st.markdown("""
         background-color: #FF3333 !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
     }
-    /* Ajuste da cor do texto */
-    .login-container p {
-        color: #CCCCCC !important;
-    }
     </style>
     """, unsafe_allow_html=True)
-
-# Constantes de autenticação
-EMAIL_CORRETO = "admincmbcapital@admin.com.br"
-SENHA_CORRETA = "Admin2025@cmbcapital"
-
-def check_login():
-    """Verifica se o usuário está logado"""
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
-
-def login_page():
-    """Renderiza a página de login"""
-    st.markdown("""
-        <div class="login-container">
-            <h1 class="login-title">🏗️ CMB Capital</h1>
-            <p style='text-align: center; color: #666;'>Sistema de Coleta de Dados</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    with st.form("login_form"):
-        email = st.text_input("Email", key="email")
-        password = st.text_input("Senha", type="password", key="password")
-        submit = st.form_submit_button("Entrar")
-
-        if submit:
-            db = SupabaseManager()
-            if db.verificar_credenciais(email, password):
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.rerun()
-            else:
-                st.error("Email ou senha incorretos!")
-
 
 @dataclass
 class ConfiguracaoScraper:
@@ -139,37 +75,13 @@ class SupabaseManager:
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
 
-    def verificar_credenciais(self, email: str, senha: str) -> bool:
-        try:
-            # Hash da senha para comparação segura
-            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-            
-            # Busca o usuário com o email fornecido
-            response = self.supabase.table('usuarios').select('*').eq('email', email).execute()
-            
-            if response.data and len(response.data) > 0:
-                usuario = response.data[0]
-                return usuario['senha_hash'] == senha_hash
-            return False
-        except Exception as e:
-            st.error(f"Erro ao verificar credenciais: {str(e)}")
-            return False
-
-    def limpar_tabela(self):
-        self.supabase.table('teste').delete().neq('id', 0).execute()
-
     def inserir_dados(self, df):
-        # Primeiro, pegamos o maior ID atual na tabela
         result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
-        # Ajustamos os IDs do novo dataframe
         df['id'] = df['id'].apply(lambda x: x + ultimo_id)
-        
-        # Convertemos a coluna data_coleta para o formato correto
         df['data_coleta'] = pd.to_datetime(df['data_coleta']).dt.strftime('%Y-%m-%d')
         
-        # Agora inserimos os dados
         registros = df.to_dict('records')
         self.supabase.table('teste').insert(registros).execute()
 
@@ -204,13 +116,11 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
             opcoes_chrome.add_argument('--enable-javascript')
             
-            # Headers mais realistas
             user_agent = self._get_random_user_agent()
             opcoes_chrome.add_argument(f'--user-agent={user_agent}')
             opcoes_chrome.add_argument('--accept-language=pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7')
             opcoes_chrome.add_argument('--accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8')
             
-            # Configurações adicionais
             opcoes_chrome.add_argument('--disable-notifications')
             opcoes_chrome.add_argument('--disable-popup-blocking')
             opcoes_chrome.add_argument('--disable-extensions')
@@ -219,13 +129,11 @@ class ScraperVivaReal:
             service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
             
-            # Configurações adicionais para evitar detecção
             navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
                 "userAgent": user_agent,
                 "platform": "Windows NT 10.0; Win64; x64"
             })
             
-            # Adicionar propriedades ao objeto navigator
             navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             navegador.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt']})")
             navegador.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
@@ -498,15 +406,13 @@ def scheduled_job():
 
 def main():
     try:
-        # Verifica o estado do login
-        check_login()
-
-        # Se não estiver logado, mostra a página de login
-        if not st.session_state.logged_in:
-            login_page()
-            return
-
-        # Adicione isso logo após a autenticação
+        # Inicializar session_state
+        if 'df' not in st.session_state:
+            st.session_state.df = None
+        if 'dados_salvos' not in st.session_state:
+            st.session_state.dados_salvos = False
+            
+        # Adiciona coleta automática no sidebar
         with st.sidebar:
             st.header("⚙️ Coleta Automática")
             auto_collect = st.checkbox("Ativar coleta automática")
@@ -522,20 +428,7 @@ def main():
                         next_run = schedule.next_run()
                         status_placeholder.info(f"Próxima coleta: {next_run}")
                         time.sleep(60)
-
-        # Inicializar session_state
-        if 'df' not in st.session_state:
-            st.session_state.df = None
-        if 'dados_salvos' not in st.session_state:
-            st.session_state.dados_salvos = False
-            
-        # Adiciona botão de logout no canto superior direito
-        col1, col2 = st.columns([6, 1])
-        with col2:
-            if st.button("Logout"):
-                st.session_state.logged_in = False
-                st.rerun()
-            
+                        
         # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
         
@@ -552,7 +445,6 @@ def main():
         ℹ️ **Informações sobre a coleta:**
         - Serão coletadas 10 páginas de resultados
         - Apenas terrenos em Eusébio/CE
-        - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
         
         # Separador visual
@@ -560,11 +452,10 @@ def main():
         
         # Botão centralizado
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            st.session_state.dados_salvos = False  # Reset estado de salvamento
+            st.session_state.dados_salvos = False
             with st.spinner("Iniciando coleta de dados..."):
                 config = ConfiguracaoScraper()
                 scraper = ScraperVivaReal(config)
-                
                 st.session_state.df = scraper.coletar_dados()
                 
         # Se temos dados coletados
@@ -594,41 +485,16 @@ def main():
                 }),
                 use_container_width=True
             )
+
+            # Botão de download
+            csv = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 Baixar dados em CSV",
+                data=csv,
+                file_name=f'terrenos_eusebio_{datetime.now().strftime("%Y%m%d")}.csv',
+                mime='text/csv',
+            )
             
-            # Confirmação para salvar no banco
-            if not st.session_state.dados_salvos:
-                st.markdown("### 💾 Salvar no Banco de Dados")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.button("✅ Salvar Dados", key='save_button', use_container_width=True):
-                        try:
-                            with st.spinner("💾 Salvando dados no banco..."):
-                                db = SupabaseManager()
-                                db.inserir_dados(df)
-                                st.session_state.dados_salvos = True
-                                st.success("✅ Dados salvos no banco de dados!")
-                                st.balloons()
-                        except Exception as e:
-                            st.error(f"❌ Erro ao salvar: {str(e)}")
-                
-                with col2:
-                    if st.button("❌ Não salvar", key='dont_save_button', use_container_width=True):
-                        st.session_state.dados_salvos = True
-                        st.info("📝 Dados não foram salvos.")
-                        
-                        # Botão de download
-                        csv = df.to_csv(index=False).encode('utf-8-sig')
-                        st.download_button(
-                            label="📥 Baixar dados em CSV",
-                            data=csv,
-                            file_name=f'terrenos_eusebio_{datetime.now().strftime("%Y%m%d")}.csv',
-                            mime='text/csv',
-                        )
-            
-            if st.session_state.dados_salvos:
-                st.info("🔄 Para iniciar uma nova coleta, atualize a página.")
-                
         # Rodapé
         st.markdown("<hr>", unsafe_allow_html=True)
         st.markdown("""
