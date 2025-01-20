@@ -1,9 +1,15 @@
 # Bibliotecas para interface web
 import streamlit as st
 import streamlit.components.v1 as components
+import schedule
 
 # Bibliotecas para manipulação de dados
 import pandas as pd
+
+# Enviar email
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
@@ -385,6 +391,51 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
+def enviar_email(total_dados):
+    try:
+        # Configurações do e-mail (substituir com suas credenciais)
+        remetente = st.secrets["EMAIL_REMETENTE"]
+        senha = st.secrets["EMAIL_SENHA"]
+        destinatario = st.secrets["EMAIL_DESTINATARIO"]
+
+        # Criando a mensagem
+        mensagem = MIMEMultipart()
+        mensagem['From'] = remetente
+        mensagem['To'] = destinatario
+        mensagem['Assunto'] = 'Coleta de Dados Concluída'
+
+        corpo = f"Coleta de dados concluída! Total de dados coletados: {total_dados}"
+        mensagem.attach(MIMEText(corpo, 'plain'))
+
+        # Enviando o e-mail
+        with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
+            servidor.starttls()
+            servidor.login(remetente, senha)
+            servidor.send_message(mensagem)
+
+        return True
+    except Exception as e:
+        logging.error(f"Erro ao enviar e-mail: {str(e)}")
+        return False
+
+# Modificar a função scheduled_job() para incluir o envio de e-mail
+def scheduled_job():
+    try:
+        config = ConfiguracaoScraper()
+        scraper = ScraperVivaReal(config)
+        df = scraper.coletar_dados()
+        if df is not None:
+            db = SupabaseManager()
+            db.inserir_dados(df)
+            total_dados = len(df)
+            enviar_email(total_dados)
+            st.success("Coleta automática concluída")
+            return True
+        return False
+    except Exception as e:
+        logging.error(f"Erro na coleta: {str(e)}")
+        return False
+
 def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -413,6 +464,8 @@ def main():
                     try:
                         db = SupabaseManager()
                         db.inserir_dados(df)
+                        total_dados = len(df)
+                        enviar_email(total_dados)
                         st.success("✅ Dados coletados e salvos com sucesso!")
                         st.balloons()
                     except Exception as e:
