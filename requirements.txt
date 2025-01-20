@@ -7,4 +7,4 @@ plotly
 folium
 streamlit-folium
 schedule
-secure-smtplib
+yagmail
