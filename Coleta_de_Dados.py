@@ -406,142 +406,25 @@ def scheduled_job():
 
 def main():
     try:
-        # Inicializar session_state
-        if 'df' not in st.session_state:
-            st.session_state.df = None
-        if 'dados_salvos' not in st.session_state:
-            st.session_state.dados_salvos = False
-            
-        # Adiciona coleta automática no sidebar
-        with st.sidebar:
-            st.header("⚙️ Coleta Automática")
-            auto_collect = st.checkbox("Ativar coleta automática")
-            if auto_collect:
-                intervalo = st.number_input("Intervalo (minutos)", min_value=1, max_value=60, value=10)
-                if st.button("Iniciar Agendamento"):
-                    schedule.every(intervalo).minutes.do(scheduled_job)
-                    st.success(f"Coleta agendada a cada {intervalo} minutos")
-                    
-                    status_placeholder = st.empty()
-                    while True:
-                        schedule.run_pending()
-                        next_run = schedule.next_run()
-                        status_placeholder.info(f"Próxima coleta: {next_run}")
-                        time.sleep(60)
-                        
-        # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
         
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <p style='font-size: 1.2em; color: #666;'>
-                Coleta de dados de terrenos à venda em Eusébio, Ceará
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Informações sobre a coleta
-        st.info("""
-        ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 10 páginas de resultados
-        - Apenas terrenos em Eusébio/CE
-        """)
-        
-        # Separador visual
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
-        # Botão centralizado
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            st.session_state.dados_salvos = False
             with st.spinner("Iniciando coleta de dados..."):
                 config = ConfiguracaoScraper()
                 scraper = ScraperVivaReal(config)
-                st.session_state.df = scraper.coletar_dados()
+                df = scraper.coletar_dados()
                 
-        # Se temos dados coletados
-        if st.session_state.df is not None and not st.session_state.df.empty:
-            df = st.session_state.df
-            
-            # Métricas principais
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total de Imóveis", len(df))
-            with col2:
-                preco_medio = df['preco_real'].mean()
-                st.metric("Preço Médio", f"R$ {preco_medio:,.2f}")
-            with col3:
-                area_media = df['area_m2'].mean()
-                st.metric("Área Média", f"{area_media:,.2f} m²")
-            
-            st.success("✅ Dados coletados com sucesso!")
-            
-            # Exibição dos dados
-            st.markdown("### 📊 Dados Coletados")
-            st.dataframe(
-                df.style.format({
-                    'preco_real': 'R$ {:,.2f}',
-                    'preco_m2': 'R$ {:,.2f}',
-                    'area_m2': '{:,.2f} m²'
-                }),
-                use_container_width=True
-            )
-
-            # Botão de download
-            csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Baixar dados em CSV",
-                data=csv,
-                file_name=f'terrenos_eusebio_{datetime.now().strftime("%Y%m%d")}.csv',
-                mime='text/csv',
-            )
-            
-        # Rodapé
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("""
-            <div style='text-align: center; padding: 1rem 0; color: #666;'>
-                <p>Desenvolvido com ❤️ por Rhuan Mateus - CMB Capital</p>
-                <p style='font-size: 0.8em;'>Última atualização: Janeiro 2025</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Separador visual para o relatório
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("## 📊 Relatório Detalhado")
-        
-        # Incorporação do relatório do Looker Studio
-        st.components.v1.iframe(
-            src="https://lookerstudio.google.com/embed/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda/page/BRhaE",
-            width=1200,
-            height=800,
-            scrolling=True
-        )
-        
-        # Botão alternativo para abrir em nova aba
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
-            <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
-                <button style='
-                    background-color: #FF4B4B;
-                    color: white;
-                    padding: 8px 16px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    cursor: pointer;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    transition: all 0.3s ease;
-                    margin: 5px 0;
-                '>
-                    📊 Abrir em Nova Aba
-                </button>
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
+                if df is not None:
+                    try:
+                        db = SupabaseManager()
+                        db.inserir_dados(df)
+                        st.success("✅ Dados coletados e salvos com sucesso!")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar no banco: {str(e)}")
         
     except Exception as e:
         st.error(f"❌ Erro inesperado: {str(e)}")
-        st.error("Por favor, atualize a página e tente novamente.")
 
 if __name__ == "__main__":
     main()
