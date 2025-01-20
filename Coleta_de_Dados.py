@@ -5,6 +5,10 @@ import streamlit.components.v1 as components
 # Bibliotecas para manipulação de dados
 import pandas as pd
 
+# Rotina de Coleta
+import schedule
+from datetime import datetime, timedelta
+
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -478,6 +482,21 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
+def scheduled_job():
+    try:
+        config = ConfiguracaoScraper()
+        scraper = ScraperVivaReal(config)
+        df = scraper.coletar_dados()
+        if df is not None:
+            db = SupabaseManager()
+            df = processar_coordenadas_em_lote(df)
+            db.inserir_dados(df)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Erro na coleta automática: {str(e)}")
+        return False
+
 def obter_coordenadas(endereco: str) -> tuple:
     try:
         endereco_completo = f"{endereco}, Eusébio, CE, Brasil"
@@ -549,6 +568,27 @@ def main():
         if not st.session_state.logged_in:
             login_page()
             return
+
+        # Adicione isso logo após a autenticação
+        with st.sidebar:
+            st.header("⚙️ Coleta Automática")
+            auto_collect = st.checkbox("Ativar coleta automática")
+            if auto_collect:
+                intervalo = st.number_input("Intervalo (minutos)", 
+                                          min_value=1, 
+                                          max_value=60, 
+                                          value=10)
+                if st.button("Iniciar Agendamento"):
+                    schedule.every(intervalo).minutes.do(scheduled_job)
+                    st.success(f"Coleta agendada a cada {intervalo} minutos")
+                    
+                    # Monitor de execução
+                    status_placeholder = st.empty()
+                    while True:
+                        schedule.run_pending()
+                        next_run = schedule.next_run()
+                        status_placeholder.info(f"Próxima coleta: {next_run}")
+                        time.sleep(60)
 
         # Inicializar session_state
         if 'df' not in st.session_state:
