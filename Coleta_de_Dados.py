@@ -2,6 +2,16 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Envio de email usando API do Gmail
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+import base64
+from email.mime.text import MIMEText
+import pickle
+import os.path
+
 # Bibliotecas para manipulação de dados
 import pandas as pd
 
@@ -80,6 +90,45 @@ class SupabaseManager:
         
         registros = df.to_dict('records')
         self.supabase.table('teste').insert(registros).execute()
+
+class GmailSender:
+    def __init__(self):
+        self.creds = Credentials.from_authorized_user_info(
+            info=st.secrets["GOOGLE_CREDENTIALS"],
+            scopes=['https://www.googleapis.com/auth/gmail.send']
+        )
+        self.service = build('gmail', 'v1', credentials=self.creds)
+        
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                self.creds = pickle.load(token)
+                
+        if not self.creds or not self.creds.valid:
+            if self.creds and self.creds.expired and self.creds.refresh_token:
+                self.creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'credentials.json', self.SCOPES)
+                self.creds = flow.run_local_server(port=0)
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(self.creds, token)
+
+        self.service = build('gmail', 'v1', credentials=self.creds)
+
+    def enviar_email(self, total_registros):
+        message = MIMEText(f"Coleta de lotes do site VivaReal foi concluída com sucesso. Total de dados coletados: {total_registros}")
+        message['to'] = 'rhuanmateuscmb@gmail.com'
+        message['subject'] = 'Coleta VivaReal Concluída'
+        
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        try:
+            self.service.users().messages().send(
+                userId='me', body={'raw': raw}).execute()
+            return True
+        except Exception as e:
+            st.error(f"Erro ao enviar email: {str(e)}")
+            return False
 
 class ScraperVivaReal:
     def __init__(self, config: ConfiguracaoScraper):
@@ -410,13 +459,17 @@ def main():
                df = scraper.coletar_dados()
                
                if df is not None:
-                   try:
-                       db = SupabaseManager()
-                       db.inserir_dados(df)
-                       st.success("✅ Dados coletados e salvos com sucesso!")
-                       st.balloons()
-                   except Exception as e:
-                       st.error(f"Erro ao salvar no banco: {str(e)}")
+                    try:
+                        db = SupabaseManager()
+                        db.inserir_dados(df)
+                        
+                        gmail = GmailSender()
+                        gmail.enviar_email(len(df))
+                        
+                        st.success("✅ Dados coletados e salvos com sucesso!")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar no banco: {str(e)}")
        
     except Exception as e:
        st.error(f"❌ Erro inesperado: {str(e)}")
