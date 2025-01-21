@@ -11,6 +11,7 @@ import base64
 from email.mime.text import MIMEText
 import pickle
 import os.path
+import json
 
 # Bibliotecas para manipulação de dados
 import pandas as pd
