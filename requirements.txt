@@ -6,6 +6,7 @@ python-dotenv~=1.0.0
 plotly
 folium
 streamlit-folium
-google-api-python-client
-google-auth-httplib2
 google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+secure-smtplib
