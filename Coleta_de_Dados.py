@@ -1,22 +1,9 @@
 # Bibliotecas para interface web
 import streamlit as st
 import streamlit.components.v1 as components
-import schedule
 
 # Bibliotecas para manipulação de dados
 import pandas as pd
-
-# Enviar email
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from base64 import urlsafe_b64encode
-from email.mime.text import MIMEText
-import base64
-import os
-import pickle
-import json
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 
 # Bibliotecas Selenium para web scraping
 from selenium import webdriver
@@ -398,69 +385,6 @@ class ScraperVivaReal:
                 except Exception as e:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
-def gerar_token():
-    SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-    creds = None
-    
-    credentials_dict = json.loads(st.secrets["GMAIL_CREDENTIALS"])
-    
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_config(
-                credentials_dict, 
-                SCOPES
-            )
-            creds = flow.run_local_server(port=0, localhost_only=False)
-        
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
-    return creds
-
-def enviar_email(total_dados):
-   """Envia email usando Gmail API"""
-   try:
-       creds = gerar_token()
-       service = build('gmail', 'v1', credentials=creds)
-       
-       mensagem = MIMEText(f'Coleta finalizada. Total de {total_dados} registros coletados.')
-       mensagem['to'] = 'rhuan.apple27@gmail.com'
-       mensagem['subject'] = f'Coleta de Dados - {datetime.now().strftime("%d/%m/%Y")}'
-       
-       raw = base64.urlsafe_b64encode(mensagem.as_bytes()).decode()
-       
-       try:
-           service.users().messages().send(userId='me', body={'raw': raw}).execute()
-           logging.info("Email enviado com sucesso")
-       except Exception as e:
-           logging.error(f"Erro ao enviar email: {str(e)}")
-           
-   except Exception as e:
-       logging.error(f"Erro na configuração do email: {str(e)}")
-
-def scheduled_job():
-   try:
-       config = ConfiguracaoScraper()
-       scraper = ScraperVivaReal(config)
-       df = scraper.coletar_dados()
-       if df is not None:
-           db = SupabaseManager()
-           db.inserir_dados(df)
-           total_dados = len(df)
-           enviar_email(total_dados)
-           st.success("Coleta automática concluída")
-           return True
-       return False
-   except Exception as e:
-       logging.error(f"Erro na coleta: {str(e)}")
-       return False
-
 def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -489,8 +413,6 @@ def main():
                    try:
                        db = SupabaseManager()
                        db.inserir_dados(df)
-                       total_dados = len(df)
-                       enviar_email(total_dados)
                        st.success("✅ Dados coletados e salvos com sucesso!")
                        st.balloons()
                    except Exception as e:
