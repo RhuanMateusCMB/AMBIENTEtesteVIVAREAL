@@ -40,17 +40,11 @@ st.set_page_config(
 # Estilo CSS personalizado
 st.markdown("""
     <style>
+    /* Estilo original do botão */
     .stButton>button {
         width: 100%;
         height: 3em;
         font-size: 20px;
-    }
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    /* Estilo para botão de submit */
-    .stButton>button {
         background-color: #FF4B4B !important;
         color: white !important;
         border: none !important;
@@ -61,6 +55,12 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #FF3333 !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    }
+    /* Estilo para botão desabilitado */
+    .stButton>button:disabled {
+        background-color: #4f4f4f !important;
+        cursor: not-allowed !important;
+        opacity: 0.6 !important;
     }
     </style>
     """, unsafe_allow_html=True)
