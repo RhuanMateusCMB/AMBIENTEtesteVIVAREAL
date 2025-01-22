@@ -493,11 +493,6 @@ def main():
         db = SupabaseManager()
         pode_coletar = db.verificar_coleta()
         
-        # Exibe a data da última coleta
-        ultima_coleta = db.obter_data_ultima_coleta()
-        if ultima_coleta:
-            st.info(f"📅 Última coleta realizada em: {ultima_coleta.strftime('%d/%m/%Y')}")
-        
         # Botão para histórico
         if st.button("📊 Ver Histórico de Coletas"):
             historico = db.obter_historico_coletas()
