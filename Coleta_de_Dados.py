@@ -454,12 +454,12 @@ def main():
             return
         
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-           with st.spinner("Iniciando coleta de dados..."):
-               config = ConfiguracaoScraper()
-               scraper = ScraperVivaReal(config)
-               df = scraper.coletar_dados()
-               
-               if df is not None:
+            with st.spinner("Iniciando coleta de dados..."):
+                config = ConfiguracaoScraper()
+                scraper = ScraperVivaReal(config)
+                df = scraper.coletar_dados()
+                
+                if df is not None:
                     try:
                         db = SupabaseManager()
                         db.inserir_dados(df)
@@ -469,6 +469,8 @@ def main():
                         
                         st.success("✅ Dados coletados e salvos com sucesso!")
                         st.balloons()
+                        time.sleep(2)  # Pequena pausa para mostrar a mensagem de sucesso
+                        st.rerun()  # Reinicia a página
                     except Exception as e:
                         st.error(f"Erro ao salvar no banco: {str(e)}")
        
