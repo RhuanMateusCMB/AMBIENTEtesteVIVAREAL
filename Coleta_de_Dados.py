@@ -98,6 +98,18 @@ class SupabaseManager:
             st.error(f"Erro ao verificar coleta: {str(e)}")
             return True
 
+    def buscar_historico(self):
+        try:
+            query = self.supabase.table('teste') \
+                .select('data_coleta, count(*)') \
+                .group('data_coleta') \
+                .order('data_coleta', desc=True) \
+                .execute()
+            return query.data
+        except Exception as e:
+            st.error(f"Erro ao buscar histórico: {str(e)}")
+            return []
+
 class GmailSender:
    def __init__(self):
        self.creds = Credentials.from_authorized_user_info(
@@ -431,50 +443,62 @@ class ScraperVivaReal:
                     self.logger.error(f"Erro ao fechar navegador: {str(e)}")
 
 def main():
-    try:
-        st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
-        
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <p style='font-size: 1.2em; color: #666;'>
-                Coleta de dados de terrenos à venda em Eusébio, Ceará
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.info("""
-        ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 1 página de resultados
-        - Apenas terrenos em Eusébio/CE
-        """)
-
-        db = SupabaseManager()
-        if db.verificar_coleta_hoje():
-            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.")
-            return
-        
-        if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            with st.spinner("Iniciando coleta de dados..."):
-                config = ConfiguracaoScraper()
-                scraper = ScraperVivaReal(config)
-                df = scraper.coletar_dados()
-                
-                if df is not None:
-                    try:
-                        db = SupabaseManager()
-                        db.inserir_dados(df)
-                        
-                        gmail = GmailSender()
-                        gmail.enviar_email(len(df))
-                        
-                        st.success("✅ Dados coletados e salvos com sucesso!")
-                        st.balloons()
-                        time.sleep(2)  # Pequena pausa para mostrar a mensagem de sucesso
-                        st.rerun()  # Reinicia a página
-                    except Exception as e:
-                        st.error(f"Erro ao salvar no banco: {str(e)}")
+   try:
+       st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
        
-    except Exception as e:
+       st.markdown("""
+       <div style='text-align: center; padding: 1rem 0;'>
+           <p style='font-size: 1.2em; color: #666;'>
+               Coleta de dados de terrenos à venda em Eusébio, Ceará
+           </p>
+       </div>
+       """, unsafe_allow_html=True)
+       
+       st.info("""
+       ℹ️ **Informações sobre a coleta:**
+       - Serão coletadas 1 página de resultados
+       - Apenas terrenos em Eusébio/CE
+       """)
+       
+       col1, col2 = st.columns(2)
+       
+       db = SupabaseManager()
+       coleta_realizada = db.verificar_coleta_hoje()
+       
+       with col1:
+           if coleta_realizada:
+               st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.")
+           
+           if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True, disabled=coleta_realizada):
+               with st.spinner("Iniciando coleta de dados..."):
+                   config = ConfiguracaoScraper()
+                   scraper = ScraperVivaReal(config)
+                   df = scraper.coletar_dados()
+                   
+                   if df is not None:
+                       try:
+                           db.inserir_dados(df)
+                           gmail = GmailSender()
+                           gmail.enviar_email(len(df))
+                           
+                           st.success("✅ Dados coletados e salvos com sucesso!")
+                           st.balloons()
+                           time.sleep(2)
+                           st.rerun()
+                       except Exception as e:
+                           st.error(f"Erro ao salvar no banco: {str(e)}")
+
+       with col2:
+           if st.button("📊 Ver Histórico", type="secondary", use_container_width=True):
+               historico = db.buscar_historico()
+               if historico:
+                   st.write("### Histórico de Coletas")
+                   for registro in historico:
+                       st.write(f"📅 {registro['data_coleta']}: {registro['count']} registros")
+               else:
+                   st.info("Nenhuma coleta registrada")
+                   
+   except Exception as e:
        st.error(f"❌ Erro inesperado: {str(e)}")
 
 if __name__ == "__main__":
