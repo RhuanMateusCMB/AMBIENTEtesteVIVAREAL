@@ -134,7 +134,7 @@ class GmailSender:
 
    def enviar_email(self, total_registros):
        message = MIMEText(f"Coleta de lotes do site VivaReal foi concluída com sucesso. Total de dados coletados: {total_registros}")
-       message['to'] = 'rhuanmateuscmb@gmail.com'
+       message['to'] = 'cabf05@gmail.com'
        message['subject'] = 'Coleta VivaReal Concluída'
        message['from'] = st.secrets["GOOGLE_CREDENTIALS"]["client_email"]
        
@@ -352,7 +352,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 1) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 32) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -455,6 +455,20 @@ class ScraperVivaReal:
 def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
+        
+        st.markdown("""
+        <div style='text-align: center; padding: 1rem 0;'>
+            <p style='font-size: 1.2em; color: #666;'>
+                Coleta de dados de terrenos à venda em Eusébio, Ceará
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("""
+        ℹ️ **Informações sobre a coleta:**
+        - Serão coletadas 32 páginas de resultados
+        - Apenas terrenos em Eusébio/CE
+        """)
         
         db = SupabaseManager()
         pode_coletar = db.verificar_coleta()
