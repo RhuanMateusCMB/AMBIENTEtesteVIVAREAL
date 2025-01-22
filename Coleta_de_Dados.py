@@ -465,7 +465,7 @@ def main():
 
         # Aviso de coleta já realizada
         if coleta_realizada:
-            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.", icon="⚠️")
+            st.warning("Coleta já realizada hoje. Nova coleta disponível amanhã.", icon="⚠️")
 
         # Botões lado a lado
         col1, col2 = st.columns(2)
