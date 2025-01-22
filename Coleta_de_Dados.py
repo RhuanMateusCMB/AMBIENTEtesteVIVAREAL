@@ -80,11 +80,9 @@ class SupabaseManager:
         self.supabase = create_client(self.url, self.key)
 
     def verificar_coleta(self):
-        # Verifica status atual
         result = self.supabase.table('coleta_status').select('*').limit(1).execute()
         
         if not result.data:
-            # Primeira execução
             self.supabase.table('coleta_status').insert({
                 'ultimo_coleta': datetime.now().date().isoformat(),
                 'pode_coletar': True
@@ -92,13 +90,15 @@ class SupabaseManager:
             return True
         
         status = result.data[0]
-        data_atual = datetime.now().date()
+        agora = datetime.now()
         ultima_coleta = datetime.strptime(status['ultimo_coleta'], '%Y-%m-%d').date()
         
-        if data_atual > ultima_coleta:
-            # Novo dia, atualiza status
+        # Verifica se já são 12:35
+        hora_liberacao = agora.replace(hour=12, minute=35, second=0, microsecond=0)
+        
+        if agora >= hora_liberacao and agora.date() > ultima_coleta:
             self.supabase.table('coleta_status').update({
-                'ultimo_coleta': data_atual.isoformat(),
+                'ultimo_coleta': agora.date().isoformat(),
                 'pode_coletar': True
             }).eq('id', status['id']).execute()
             return True
@@ -114,6 +114,14 @@ class SupabaseManager:
         result = self.supabase.table('coleta_status').select('ultimo_coleta').limit(1).execute()
         if result.data:
             return datetime.strptime(result.data[0]['ultimo_coleta'], '%Y-%m-%d')
+            
+    def obter_historico_coletas(self):
+        result = self.supabase.table('imoveisdireto')\
+            .select('data_coleta, count(*)')\
+            .group('data_coleta')\
+            .order('data_coleta', desc=True)\
+            .execute()
+        return pd.DataFrame(result.data)
 
     def inserir_dados(self, df):
         result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
@@ -477,12 +485,22 @@ def main():
         
         db = SupabaseManager()
         pode_coletar = db.verificar_coleta()
-
+        
         # Exibe a data da última coleta
         ultima_coleta = db.obter_data_ultima_coleta()
         if ultima_coleta:
             st.info(f"📅 Última coleta realizada em: {ultima_coleta.strftime('%d/%m/%Y')}")
         
+        # Botão para histórico
+        if st.button("📊 Ver Histórico de Coletas"):
+            historico = db.obter_historico_coletas()
+            if not historico.empty:
+                historico.columns = ['Data', 'Quantidade']
+                historico['Data'] = pd.to_datetime(historico['Data']).dt.strftime('%d/%m/%Y')
+                st.dataframe(historico, use_container_width=True)
+            else:
+                st.info("Nenhuma coleta registrada ainda.")
+
         if not pode_coletar:
             st.warning("⚠️ Coleta já realizada hoje. Próxima coleta disponível amanhã.")
             return
