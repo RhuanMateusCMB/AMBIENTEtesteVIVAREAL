@@ -80,14 +80,14 @@ class SupabaseManager:
         self.supabase = create_client(self.url, self.key)
 
     def inserir_dados(self, df):
-        result = self.supabase.table('imoveisdireto').select('id').order('id.desc').limit(1).execute()
+        result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
         df['id'] = df['id'].apply(lambda x: x + ultimo_id)
         df['data_coleta'] = pd.to_datetime(df['data_coleta']).dt.strftime('%Y-%m-%d')
         
         registros = df.to_dict('records')
-        self.supabase.table('imoveisdireto').insert(registros).execute()
+        self.supabase.table('teste').insert(registros).execute()
 
 class GmailSender:
    def __init__(self):
