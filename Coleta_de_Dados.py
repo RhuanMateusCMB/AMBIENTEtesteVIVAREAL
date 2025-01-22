@@ -79,6 +79,37 @@ class SupabaseManager:
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
 
+    def verificar_coleta(self):
+        # Verifica status atual
+        result = self.supabase.table('coleta_status').select('*').limit(1).execute()
+        
+        if not result.data:
+            # Primeira execução
+            self.supabase.table('coleta_status').insert({
+                'ultimo_coleta': datetime.now().date().isoformat(),
+                'pode_coletar': True
+            }).execute()
+            return True
+        
+        status = result.data[0]
+        data_atual = datetime.now().date()
+        ultima_coleta = datetime.strptime(status['ultimo_coleta'], '%Y-%m-%d').date()
+        
+        if data_atual > ultima_coleta:
+            # Novo dia, atualiza status
+            self.supabase.table('coleta_status').update({
+                'ultimo_coleta': data_atual.isoformat(),
+                'pode_coletar': True
+            }).eq('id', status['id']).execute()
+            return True
+            
+        return status['pode_coletar']
+
+    def marcar_coleta_realizada(self):
+        self.supabase.table('coleta_status').update({
+            'pode_coletar': False
+        }).eq('id', 1).execute()
+
     def inserir_dados(self, df):
         result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
@@ -321,7 +352,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 1) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 32) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
@@ -425,30 +456,23 @@ def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
         
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <p style='font-size: 1.2em; color: #666;'>
-                Coleta de dados de terrenos à venda em Eusébio, Ceará
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        db = SupabaseManager()
+        pode_coletar = db.verificar_coleta()
         
-        st.info("""
-        ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 1 páginas de resultados
-        - Apenas terrenos em Eusébio/CE
-        """)
+        if not pode_coletar:
+            st.warning("⚠️ Coleta já realizada hoje. Próxima coleta disponível amanhã.")
+            return
         
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-           with st.spinner("Iniciando coleta de dados..."):
-               config = ConfiguracaoScraper()
-               scraper = ScraperVivaReal(config)
-               df = scraper.coletar_dados()
-               
-               if df is not None:
+            with st.spinner("Iniciando coleta de dados..."):
+                config = ConfiguracaoScraper()
+                scraper = ScraperVivaReal(config)
+                df = scraper.coletar_dados()
+                
+                if df is not None:
                     try:
-                        db = SupabaseManager()
                         db.inserir_dados(df)
+                        db.marcar_coleta_realizada()
                         
                         gmail = GmailSender()
                         gmail.enviar_email(len(df))
@@ -457,9 +481,9 @@ def main():
                         st.balloons()
                     except Exception as e:
                         st.error(f"Erro ao salvar no banco: {str(e)}")
-       
+    
     except Exception as e:
-       st.error(f"❌ Erro inesperado: {str(e)}")
+        st.error(f"❌ Erro inesperado: {str(e)}")
 
 if __name__ == "__main__":
     main()
