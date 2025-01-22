@@ -433,11 +433,6 @@ class ScraperVivaReal:
 def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
-
-        db = SupabaseManager()
-        if db.verificar_coleta_hoje():
-            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.")
-            return
         
         st.markdown("""
         <div style='text-align: center; padding: 1rem 0;'>
@@ -452,6 +447,11 @@ def main():
         - Serão coletadas 1 página de resultados
         - Apenas terrenos em Eusébio/CE
         """)
+
+        db = SupabaseManager()
+        if db.verificar_coleta_hoje():
+            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.")
+            return
         
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
            with st.spinner("Iniciando coleta de dados..."):
