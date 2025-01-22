@@ -503,6 +503,8 @@ def main():
             if not historico.empty:
                 historico.columns = ['Data', 'Quantidade']
                 historico['Data'] = pd.to_datetime(historico['Data']).dt.strftime('%d/%m/%Y')
+                # Formatação para mostrar números inteiros sem decimais
+                historico['Quantidade'] = historico['Quantidade'].astype(int)
                 st.dataframe(historico, use_container_width=True)
             else:
                 st.info("Nenhuma coleta registrada ainda.")
