@@ -487,14 +487,14 @@ def main():
                            st.error(f"Erro ao salvar no banco: {str(e)}")
 
        with col2:
-           if st.button("📊 Ver Histórico", type="secondary", use_container_width=True):
-               historico = db.buscar_historico()
-               if historico:
-                   st.write("### Histórico de Coletas")
-                   for registro in historico:
-                       st.write(f"📅 {registro['data_coleta']}: {registro['count']} registros")
-               else:
-                   st.info("Nenhuma coleta registrada")
+            if st.button("📊 Ver Histórico", type="secondary", use_container_width=True):
+                historico = db.buscar_historico()
+                if historico:
+                    st.write("### Histórico de Coletas")
+                    for registro in historico:
+                        st.write(f"📅 {registro['data_coleta']}: {registro['total']} registros")
+                else:
+                    st.info("Nenhuma coleta registrada")
                    
    except Exception as e:
        st.error(f"❌ Erro inesperado: {str(e)}")
