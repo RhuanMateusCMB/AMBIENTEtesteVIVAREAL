@@ -79,66 +79,15 @@ class SupabaseManager:
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
 
-    def verificar_coleta(self):
-        result = self.supabase.table('coleta_status').select('*').limit(1).execute()
-        
-        if not result.data:
-            self.supabase.table('coleta_status').insert({
-                'ultimo_coleta': datetime.now().date().isoformat(),
-                'pode_coletar': True
-            }).execute()
-            return True
-        
-        status = result.data[0]
-        agora = datetime.now()
-        ultima_coleta = datetime.strptime(status['ultimo_coleta'], '%Y-%m-%d').date()
-        
-        # Verifica se já são 12:35
-        hora_liberacao = agora.replace(hour=12, minute=35, second=0, microsecond=0)
-        
-        if agora >= hora_liberacao and agora.date() > ultima_coleta:
-            self.supabase.table('coleta_status').update({
-                'ultimo_coleta': agora.date().isoformat(),
-                'pode_coletar': True
-            }).eq('id', status['id']).execute()
-            return True
-            
-        return status['pode_coletar']
-
-    def marcar_coleta_realizada(self):
-        self.supabase.table('coleta_status').update({
-            'pode_coletar': False
-        }).eq('id', 1).execute()
-        
-    def obter_data_ultima_coleta(self):
-        result = self.supabase.table('coleta_status').select('ultimo_coleta').limit(1).execute()
-        if result.data:
-            return datetime.strptime(result.data[0]['ultimo_coleta'], '%Y-%m-%d')
-            
-    def obter_historico_coletas(self):
-        # Busca todos os registros agrupados por data
-        result = self.supabase.table('teste')\
-            .select('data_coleta, id')\
-            .execute()
-            
-        if not result.data:
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(result.data)
-        historico = df.groupby('data_coleta').size().reset_index(name='Quantidade')
-        historico.columns = ['Data', 'Quantidade']
-        historico = historico.sort_values('Data', ascending=False)
-        return historico
-
     def inserir_dados(self, df):
-        result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
+        result = self.supabase.table('imoveisdireto').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
         df['id'] = df['id'].apply(lambda x: x + ultimo_id)
         df['data_coleta'] = pd.to_datetime(df['data_coleta']).dt.strftime('%Y-%m-%d')
         
         registros = df.to_dict('records')
-        self.supabase.table('teste').insert(registros).execute()
+        self.supabase.table('imoveisdireto').insert(registros).execute()
 
 class GmailSender:
    def __init__(self):
@@ -486,39 +435,20 @@ def main():
         
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 32 páginas de resultados
+        - Serão coletadas 1 página de resultados
         - Apenas terrenos em Eusébio/CE
         """)
         
-        db = SupabaseManager()
-        pode_coletar = db.verificar_coleta()
-        
-        # Botão para histórico
-        if st.button("📊 Ver Histórico de Coletas"):
-            historico = db.obter_historico_coletas()
-            if not historico.empty:
-                historico.columns = ['Data', 'Quantidade']
-                historico['Data'] = pd.to_datetime(historico['Data']).dt.strftime('%d/%m/%Y')
-                # Formatação para mostrar números inteiros sem decimais
-                historico['Quantidade'] = historico['Quantidade'].astype(int)
-                st.dataframe(historico, use_container_width=True)
-            else:
-                st.info("Nenhuma coleta registrada ainda.")
-
-        if not pode_coletar:
-            st.warning("⚠️ Coleta já realizada hoje. Próxima coleta disponível amanhã.")
-            return
-        
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
-            with st.spinner("Iniciando coleta de dados..."):
-                config = ConfiguracaoScraper()
-                scraper = ScraperVivaReal(config)
-                df = scraper.coletar_dados()
-                
-                if df is not None:
+           with st.spinner("Iniciando coleta de dados..."):
+               config = ConfiguracaoScraper()
+               scraper = ScraperVivaReal(config)
+               df = scraper.coletar_dados()
+               
+               if df is not None:
                     try:
+                        db = SupabaseManager()
                         db.inserir_dados(df)
-                        db.marcar_coleta_realizada()
                         
                         gmail = GmailSender()
                         gmail.enviar_email(len(df))
@@ -527,9 +457,9 @@ def main():
                         st.balloons()
                     except Exception as e:
                         st.error(f"Erro ao salvar no banco: {str(e)}")
-    
+       
     except Exception as e:
-        st.error(f"❌ Erro inesperado: {str(e)}")
+       st.error(f"❌ Erro inesperado: {str(e)}")
 
 if __name__ == "__main__":
     main()
