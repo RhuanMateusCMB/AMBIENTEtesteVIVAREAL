@@ -100,12 +100,14 @@ class SupabaseManager:
 
     def buscar_historico(self):
         try:
-            query = self.supabase.table('teste') \
-                .select('data_coleta, count(*)') \
-                .group('data_coleta') \
-                .order('data_coleta', desc=True) \
-                .execute()
-            return query.data
+            query = """
+            SELECT data_coleta, COUNT(*) as total
+            FROM teste
+            GROUP BY data_coleta
+            ORDER BY data_coleta DESC
+            """
+            result = self.supabase.table('teste').select('*').execute(query)
+            return result.data if result.data else []
         except Exception as e:
             st.error(f"Erro ao buscar histórico: {str(e)}")
             return []
