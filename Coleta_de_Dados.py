@@ -436,7 +436,7 @@ def main():
 
         db = SupabaseManager()
         if db.verificar_coleta_hoje():
-            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível após 00:00.")
+            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível amanhã.")
             return
         
         st.markdown("""
