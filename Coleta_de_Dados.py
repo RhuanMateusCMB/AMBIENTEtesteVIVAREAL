@@ -89,6 +89,15 @@ class SupabaseManager:
         registros = df.to_dict('records')
         self.supabase.table('teste').insert(registros).execute()
 
+    def verificar_coleta_hoje(self):
+        try:
+            hoje = datetime.now().strftime('%Y-%m-%d')
+            result = self.supabase.table('teste').select('data_coleta').eq('data_coleta', hoje).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Erro ao verificar coleta: {str(e)}")
+            return True
+
 class GmailSender:
    def __init__(self):
        self.creds = Credentials.from_authorized_user_info(
@@ -424,6 +433,11 @@ class ScraperVivaReal:
 def main():
     try:
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
+
+        db = SupabaseManager()
+        if db.verificar_coleta_hoje():
+            st.warning("⚠️ Coleta já realizada hoje. Nova coleta disponível após 00:00.")
+            return
         
         st.markdown("""
         <div style='text-align: center; padding: 1rem 0;'>
