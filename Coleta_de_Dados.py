@@ -100,14 +100,10 @@ class SupabaseManager:
 
     def buscar_historico(self):
         try:
-            query = """
-            SELECT data_coleta, COUNT(*) as total
-            FROM teste
-            GROUP BY data_coleta
-            ORDER BY data_coleta DESC
-            """
-            result = self.supabase.table('teste').select('*').execute(query)
-            return result.data if result.data else []
+            result = self.supabase.rpc(
+                'get_coleta_historico',
+                {}).execute()
+            return result.data
         except Exception as e:
             st.error(f"Erro ao buscar histórico: {str(e)}")
             return []
