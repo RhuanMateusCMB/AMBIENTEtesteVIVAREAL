@@ -109,6 +109,11 @@ class SupabaseManager:
         self.supabase.table('coleta_status').update({
             'pode_coletar': False
         }).eq('id', 1).execute()
+        
+    def obter_data_ultima_coleta(self):
+        result = self.supabase.table('coleta_status').select('ultimo_coleta').limit(1).execute()
+        if result.data:
+            return datetime.strptime(result.data[0]['ultimo_coleta'], '%Y-%m-%d')
 
     def inserir_dados(self, df):
         result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
@@ -472,6 +477,11 @@ def main():
         
         db = SupabaseManager()
         pode_coletar = db.verificar_coleta()
+
+        # Exibe a data da última coleta
+        ultima_coleta = db.obter_data_ultima_coleta()
+        if ultima_coleta:
+            st.info(f"📅 Última coleta realizada em: {ultima_coleta.strftime('%d/%m/%Y')}")
         
         if not pode_coletar:
             st.warning("⚠️ Coleta já realizada hoje. Próxima coleta disponível amanhã.")
