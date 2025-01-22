@@ -116,17 +116,18 @@ class SupabaseManager:
             return datetime.strptime(result.data[0]['ultimo_coleta'], '%Y-%m-%d')
             
     def obter_historico_coletas(self):
-        # Busca todos os registros e faz o agrupamento com pandas
-        result = self.supabase.table('imoveisdireto')\
-            .select('data_coleta')\
+        # Busca todos os registros agrupados por data
+        result = self.supabase.table('teste')\
+            .select('data_coleta, id')\
             .execute()
             
         if not result.data:
             return pd.DataFrame()
             
         df = pd.DataFrame(result.data)
-        historico = df.groupby('data_coleta').size().reset_index(name='count')
-        historico = historico.sort_values('data_coleta', ascending=False)
+        historico = df.groupby('data_coleta').size().reset_index(name='Quantidade')
+        historico.columns = ['Data', 'Quantidade']
+        historico = historico.sort_values('Data', ascending=False)
         return historico
 
     def inserir_dados(self, df):
