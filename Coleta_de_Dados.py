@@ -80,9 +80,11 @@ class SupabaseManager:
         self.supabase = create_client(self.url, self.key)
 
     def verificar_coleta(self):
+        # Verifica status atual
         result = self.supabase.table('coleta_status').select('*').limit(1).execute()
         
         if not result.data:
+            # Primeira execução
             self.supabase.table('coleta_status').insert({
                 'ultimo_coleta': datetime.now().date().isoformat(),
                 'pode_coletar': True
@@ -90,15 +92,13 @@ class SupabaseManager:
             return True
         
         status = result.data[0]
-        agora = datetime.now()
+        data_atual = datetime.now().date()
         ultima_coleta = datetime.strptime(status['ultimo_coleta'], '%Y-%m-%d').date()
         
-        # Verifica se já são 12:35
-        hora_liberacao = agora.replace(hour=12, minute=35, second=0, microsecond=0)
-        
-        if agora >= hora_liberacao and agora.date() > ultima_coleta:
+        if data_atual > ultima_coleta:
+            # Novo dia, atualiza status
             self.supabase.table('coleta_status').update({
-                'ultimo_coleta': agora.date().isoformat(),
+                'ultimo_coleta': data_atual.isoformat(),
                 'pode_coletar': True
             }).eq('id', status['id']).execute()
             return True
